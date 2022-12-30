@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/luis_e/projects/curso-yuneta/01-print-hello-world/c/build",
+  "command": "/usr/bin/cc    -o CMakeFiles/HelloWorld.dir/main.c.o -c /home/luis_e/projects/curso-yuneta/01-print-hello-world/c/main.c",
+  "file": "/home/luis_e/projects/curso-yuneta/01-print-hello-world/c/main.c"
+}
+]
