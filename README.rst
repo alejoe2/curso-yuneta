@@ -10,13 +10,12 @@ Skills
 - Documentation: Sphinx (reStructuredText language).
 - IDE's: Kdevelop
 
-Knowlegde
+Knowledge
 =========
 
-- The first jerarchique structure we must use to organize us is the file system.
+- The first hierarchic structure we must use to organize us is the file system.
 
 Index
 =====
 
 - 01-print-hello-world
-
