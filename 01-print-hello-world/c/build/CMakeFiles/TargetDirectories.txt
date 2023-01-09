@@ -1,3 +1,0 @@
-/home/luis_e/projects/curso-yuneta/01-print-hello-world/c/build/CMakeFiles/HelloWorld.dir
-/home/luis_e/projects/curso-yuneta/01-print-hello-world/c/build/CMakeFiles/edit_cache.dir
-/home/luis_e/projects/curso-yuneta/01-print-hello-world/c/build/CMakeFiles/rebuild_cache.dir
