@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
     
     for ( int i = 1; i <= maxLoop; ++i)
     {
-        printf("Hello World, ");
+        printf("Hello World.");
         printf("%d ", i);
         printf("\n");
     }
