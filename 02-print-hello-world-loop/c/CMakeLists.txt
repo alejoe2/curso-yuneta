@@ -1,33 +1,37 @@
+###########################################
+#    CMake
+###########################################
+
 cmake_minimum_required(VERSION 3.0)
 
 project(02HelloWorldProjectLoop C)
 
-set(CMAKE_INSTALL_PREFIX /home/luis_e/Escritorio/proyects_yuneta/curso-yuneta)
+set(CMAKE_INSTALL_PREFIX /yuneta/development/projects/curso-yuneta/luis-echeverria)
 
 set(BIN_DEST_DIR ${CMAKE_INSTALL_PREFIX}/bin)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=c99")
-
+     
 if(CMAKE_BUILD_TYPE MATCHES Debug)
-  add_definitions(-DDEBUG)
-  option(SHOWNOTES "Show preprocessor notes" OFF)
+    add_definitions(-DDEBUG)
+    option(SHOWNOTES "Show preprocessor notes" OFF)
 
-  if(CMAKE_COMPILER_IS_GNUCC)
-	# GCC specific debug options
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g3 -ggdb3 -gdwarf-2")
-	set(AVOID_VERSION -avoid-version)
-  endif(CMAKE_COMPILER_IS_GNUCC)
+    if(CMAKE_COMPILER_IS_GNUCC)
+        # GCC specific debug options
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g3 -ggdb3 -gdwarf-2")
+        set(AVOID_VERSION -avoid-version)
+    endif(CMAKE_COMPILER_IS_GNUCC)
 endif(CMAKE_BUILD_TYPE MATCHES Debug)
 
 add_executable(02HelloWorldLoop src/main.c)
 
 install(
-	TARGETS 02HelloWorldLoop
-	PERMISSIONS
-	OWNER_READ OWNER_WRITE
-	GROUP_READ GROUP_WRITE
-	WORLD_READ
-	DESTINATION ${BIN_DEST_DIR}
+    TARGETS 02HelloWorldLoop
+    PERMISSIONS
+    OWNER_READ OWNER_WRITE
+    GROUP_READ GROUP_WRITE
+    WORLD_READ
+    DESTINATION ${BIN_DEST_DIR}
 )
 
 # compile in Release mode optimized but adding debug symbols, useful for profiling :
@@ -39,4 +43,3 @@ install(
 #     cmake -DCMAKE_BUILD_TYPE=Debug ..
 #
 # Compilando para ARM poner cmake -DNOT_INCLUDE_LIBUNWIND
-#
