@@ -17,28 +17,20 @@ Index
 Compilation and intall
 =======
 
-1. Create build directory and move to it.
-```
-mkdir build
-```
-```
-cd build/
-```
+1. Create build directory and move to it::
+    
+    mkdir build
+    cd build/
 
-2. Compile
-```
-cmake -DCMAKE_BUILD_TYPE=Debug ..
-```
+2. Compile::
 
-3. Install
-```
-make
-```
-```
-make install
-```
+    cmake -DCMAKE_BUILD_TYPE=Debug ..
 
-4. Run program
-```
-../bin/02HelloWorldLoop
-```
+3. Install::
+    
+    make
+    make install
+
+4. Run program::
+
+    ../bin/02HelloWorldLoop
