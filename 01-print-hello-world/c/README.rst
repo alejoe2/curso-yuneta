@@ -21,6 +21,8 @@ Compilation and intall
 1. Create build directory and move to it.
 ```
 mkdir build
+```
+```
 cd build/
 ```
 
@@ -32,6 +34,8 @@ cmake -DCMAKE_BUILD_TYPE=Debug ..
 3. Install
 ```
 make
+```
+```
 make install
 ```
 
