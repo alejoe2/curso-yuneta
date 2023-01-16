@@ -1,5 +1,4 @@
-Yuneta Course
-=============
+##Yuneta Course
 
 Skills
 ======
@@ -15,5 +14,27 @@ Index
 
 - 02-print-hello-world-loop
 
+Compilation and intall
 =======
 
+1. Create build directory and move to it.
+```
+mkdir build
+cd build/
+```
+
+2. Compile
+```
+cmake -DCMAKE_BUILD_TYPE=Debug ..
+```
+
+3. Install
+```
+make
+make install
+```
+
+4. Run program
+```
+../bin/02HelloWorldLoop
+```
