@@ -1,6 +1,5 @@
- 
-/build
-/bin
-/.vscode
-/.kdev4
+build/
+bin/
+.vscode/
+.kdev4/
 *.kdev4

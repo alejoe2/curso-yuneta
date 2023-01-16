@@ -2,9 +2,10 @@
 #    CMake
 ###########################################
 
-cmake_minimum_required(VERSION 3.0)
-
 project(02HelloWorldProjectLoop C)
+cmake_minimum_required(VERSION 3.0)
+include(CheckIncludeFiles)
+include(CheckSymbolExists)
 
 set(CMAKE_INSTALL_PREFIX /yuneta/development/projects/curso-yuneta/luis-echeverria)
 
@@ -23,14 +24,27 @@ if(CMAKE_BUILD_TYPE MATCHES Debug)
     endif(CMAKE_COMPILER_IS_GNUCC)
 endif(CMAKE_BUILD_TYPE MATCHES Debug)
 
+add_definitions(-D_GNU_SOURCE)
+add_definitions(-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64)
+
+check_include_files(regex.h HAVE_REGEX_H)
+if(HAVE_REGEX_H)
+    add_definitions(-DHAVE_REGEX_H)
+else(HAVE_REGEX_H)
+    message("***  WARNING: GNU C regex library not found.")
+endif(HAVE_REGEX_H)
+
 add_executable(02HelloWorldLoop src/main.c)
 
+##############################################
+#   Installation
+##############################################
 install(
     TARGETS 02HelloWorldLoop
     PERMISSIONS
-    OWNER_READ OWNER_WRITE
-    GROUP_READ GROUP_WRITE
-    WORLD_READ
+    OWNER_READ OWNER_WRITE OWNER_EXECUTE
+    GROUP_READ GROUP_WRITE GROUP_EXECUTE
+    WORLD_READ WORLD_EXECUTE
     DESTINATION ${BIN_DEST_DIR}
 )
 
