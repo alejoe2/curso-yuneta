@@ -1,7 +1,6 @@
 ###########################################
 #    CMake
 ###########################################
-
 project(01HelloWorldProject C)
 cmake_minimum_required(VERSION 3.0)
 include(CheckIncludeFiles)
@@ -34,7 +33,17 @@ else(HAVE_REGEX_H)
     message("***  WARNING: GNU C regex library not found.")
 endif(HAVE_REGEX_H)
 
-add_executable(01HelloWorld src/main.c)
+##############################################
+#   Source
+##############################################
+SET (01HelloWorld
+    src/main.c
+)
+
+##############################################
+# Add Executable
+##############################################
+add_executable(01HelloWorld ${01HelloWorld})
 
 ##############################################
 #   Installation

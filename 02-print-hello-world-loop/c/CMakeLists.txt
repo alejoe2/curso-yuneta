@@ -1,7 +1,6 @@
 ###########################################
 #    CMake
 ###########################################
-
 project(02HelloWorldProjectLoop C)
 cmake_minimum_required(VERSION 3.0)
 include(CheckIncludeFiles)
@@ -12,7 +11,7 @@ set(CMAKE_INSTALL_PREFIX /yuneta/development/projects/curso-yuneta/luis-echeverr
 set(BIN_DEST_DIR ${CMAKE_INSTALL_PREFIX}/bin)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=c99")
-     
+
 if(CMAKE_BUILD_TYPE MATCHES Debug)
     add_definitions(-DDEBUG)
     option(SHOWNOTES "Show preprocessor notes" OFF)
@@ -34,7 +33,17 @@ else(HAVE_REGEX_H)
     message("***  WARNING: GNU C regex library not found.")
 endif(HAVE_REGEX_H)
 
-add_executable(02HelloWorldLoop src/main.c)
+##############################################
+#   Source
+##############################################
+SET (02HelloWorldLoop
+    src/main.c
+)
+
+##############################################
+# Add Executable
+##############################################
+add_executable(02HelloWorldLoop ${02HelloWorldLoop})
 
 ##############################################
 #   Installation

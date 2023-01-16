@@ -39,6 +39,6 @@ int main(int argc, char *argv[])
     clock_gettime(CLOCK_MONOTONIC, &end_t);
 
     diff_t = ts_diff(start_t, end_t);
-    printf("Total time taken by CPU: %lu.%lus\n", diff_t.tv_sec, diff_t.tv_nsec);
+    printf("Total time taken by CPU: %lu.%lus, Total loops: %d\n", diff_t.tv_sec, diff_t.tv_nsec, maxLoop);
     return 0;
 }
