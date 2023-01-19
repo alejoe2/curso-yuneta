@@ -18,12 +18,21 @@ struct arguments
 {
     char *args[MAX_ARGS + 1]; /* positional args */
     int repeat;
+    int version;
 };
 
 /***************************************************************************
  *              Prototypes
  ***************************************************************************/
 static error_t parse_opt(int key, char *arg, struct argp_state *state);
+
+/***************************************************************************
+ *      Data
+ ***************************************************************************/
+
+// Set by yuneta_entry_point()
+const char *argp_program_version = "Hello World Loop 1.0.0";
+const char *argp_program_bug_address = "echeverrialuish@hotmail.com";
 
 /* Program documentation. */
 static char doc[] = "Command Line Interface Hello World";
@@ -64,6 +73,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
         if(arg) {
             arguments->repeat = atoi(arg);
         }
+        break;
+    case 'v':
+        arguments->version = 1;
         break;
 
     case ARGP_KEY_ARG:
@@ -137,6 +149,7 @@ int main(int argc, char *argv[])
      *  Parse arguments
      */
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
+
     showhelloloop(arguments.repeat);
 
     return 0;
