@@ -18,7 +18,6 @@ struct arguments
 {
     char *args[MAX_ARGS + 1]; /* positional args */
     int repeat;
-    int version;
 };
 
 /***************************************************************************
@@ -30,9 +29,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state);
  *      Data
  ***************************************************************************/
 
-// Set by yuneta_entry_point()
-const char *argp_program_version = "Hello World Loop 1.0.0";
-const char *argp_program_bug_address = "echeverrialuish@hotmail.com";
+// entry_point()
 
 /* Program documentation. */
 static char doc[] = "Command Line Interface Hello World";
@@ -45,7 +42,10 @@ static char args_doc[] = "";
  *  See https://www.gnu.org/software/libc/manual/html_node/Argp-Option-Vectors.html
  */
 static struct argp_option options[] = {
-    {"repeat", 'r', "TIMES", 0, "Repeat execution 'Hello World' times. Default Times=100", 1},
+    {0, 0, 0, 0, "Options:"},
+    {"repeat", 'r', "TIMES", 0, "Repeat execution 'Hello World' times. Default repeat=100", 1},
+    {0, 0, 0, 0, "Options Info. App:"},
+    {"version", 'v', 0, 0, "Print program version", 1},
     {0},
 };
 
@@ -63,6 +63,12 @@ static struct argp argp = {
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
 {
     /*
+     *  Var Infor App
+     */
+    const char *program_version = "Hello World Loop 1.0.0";
+    // const char *program_bug_address = "echeverrialuish@hotmail.com";
+
+    /*
      *  Get the input argument from argp_parse,
      *  which we know is a pointer to our arguments structure.
      */
@@ -75,7 +81,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
         }
         break;
     case 'v':
-        arguments->version = 1;
+        printf("%s\n", program_version);
+        exit(0);
         break;
 
     case ARGP_KEY_ARG:
