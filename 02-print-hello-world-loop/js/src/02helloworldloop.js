@@ -24,9 +24,11 @@ function main() {
 
     // Define Menu Opc.
     program
+        .command('./02helloworldloop.js')
+        .description('Command Line Interface Hello World')
+        .usage('[-h] [-v] [-r REPEAT]')
+        .option('-r, --repeat <REPEAT>', 'Repeat execution "Hello World" times', parseInt, 100)
         .version('Hello World Loop 1.0.0', '-v, --version')
-        .usage('[options]')
-        .option('-r, --repeat <n>', 'Repeat execution "Hello World" times. Default repeat=100', parseInt)
         .parse(process.argv);
 
     const options = program.opts();
@@ -35,7 +37,7 @@ function main() {
         repeat = options.repeat
     }
 
-    // Ejecuta Funtion Loop
+    // Ejec. Funtion Loop
     showhelloloop(repeat);
 }
 
