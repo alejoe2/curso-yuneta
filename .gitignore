@@ -1,5 +1,6 @@
 build/
 bin/
+node_modules/
 .vscode/
 .kdev4/
 *.kdev4
