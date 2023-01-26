@@ -1,6 +1,10 @@
 build/
 bin/
+dist/
+__pycache__/
 node_modules/
+*.egg-info/
+
 .vscode/
 .kdev4/
 *.kdev4
