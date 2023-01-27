@@ -17,7 +17,7 @@ def main():
     ip = "127.0.0.1"
 
     #  Parse arguments
-    parser = argparse.ArgumentParser(description="Command Line Interface Hello World")
+    parser = argparse.ArgumentParser(description="Command Line Connect to tpc port")
     parser.add_argument("-v", "--version", help="Print program version", action="version", version=__version__)
     group1 = parser.add_argument_group('options for execution')
     group1.add_argument("-p", "--port", help="define port to use, default port=7000", type=int, default=port)
