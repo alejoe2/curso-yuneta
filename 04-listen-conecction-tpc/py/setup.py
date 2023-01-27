@@ -17,14 +17,14 @@ try:
 except IOError:
     README = CHANGES = ''
 
-from helloworldloop import __version__
+from connecttpcport import __version__
 
 requires = []
 
 setup(
-    name="helloworldloop",
+    name="connecttpcport",
     version=__version__,
-    description="Hello World Loop",
+    description="Connect to a tcp port and send data",
     author="Luis Echeverria",
     author_email='echeverrialuish@hotmail.com',
     license='MIT License',
@@ -36,7 +36,7 @@ setup(
     python_requires='>=3.5',
     entry_points={
         'console_scripts': [
-            'helloworldloop = helloworldloop:main'
+            'connecttpcport = connecttpcport:main'
         ]
     }
 )
