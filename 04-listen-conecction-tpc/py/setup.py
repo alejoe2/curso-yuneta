@@ -19,7 +19,7 @@ except IOError:
 
 from connecttpcport import __version__
 
-requires = ['argparse', 'socket']
+requires = []
 
 setup(
     name="connecttpcport",
