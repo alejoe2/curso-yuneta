@@ -33,6 +33,7 @@ setup(
     zip_safe=False,
     install_requires=requires,
     tests_require=[],
+    py_modules=['miprograma'],
     python_requires='>=3.5',
     entry_points={
         'console_scripts': [
