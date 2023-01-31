@@ -43,27 +43,30 @@ def connectport(port, ip, FILES):
     # Connect to the server
     client_socket.connect((ip, port))
 
-    # open the file to be sent
+    # open list files to be sent
     files = open(FILES, "rb")
 
     listFile=files.read().decode().split("\n")
 
     files.close()
     
-    
     for i, filepath in enumerate(listFile):
+        
         if filepath !=  "":
             print("Send: ", filepath)
+            
             try:
+                # open the file to be sent and send
                 with open(filepath, 'rb') as f:
                     file_data = (filepath+'\0').encode() + f.read()
                     client_socket.sendall(file_data)
+                # receive confirmation
                 if(i < len(listFile)-1):
                     confirmation = client_socket.recv(1024)
                     print(f'Received: {confirmation.decode()}')
+            
             except FileNotFoundError:
                 print("The file is not found\n")
-    
     
     # close the socket and file
     client_socket.close()
