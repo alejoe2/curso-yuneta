@@ -127,7 +127,7 @@ void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
         return;
     }
     if(nread > 0) {
-
+        /* Receive file */
         char *filename = (char *)buf->base;
         int i = 0;
         while(filename[i] != '\0') {
@@ -139,9 +139,9 @@ void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
         FILE *fp = fopen(filename, "w+");
         fwrite(buf->base + i + 1, sizeof(char), nread - i - 1, fp);
         fclose(fp);
-
         printf("Received %d bytes and saved as %s\n", (int)nread, filename);
 
+        /* Send Confirmation. */
         uv_write_t *req = malloc(sizeof(uv_write_t));
         uv_buf_t buf = uv_buf_init("OK\n", 3);
         uv_write(req, (uv_stream_t *)client, &buf, 1, NULL);
