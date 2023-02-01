@@ -9,6 +9,8 @@ add_subdirectory(01-print-hello-world/c)
 add_subdirectory(02-print-hello-world-loop/c)
 add_subdirectory(03-print-hello-name/c)
 add_subdirectory(04-listen-conecction-tpc/c)
+add_subdirectory(05-listen-tpc-file/c)
+add_subdirectory(06-listen-tpc-multi-file/c)
 
 # compile in Release mode optimized but adding debug symbols, useful for profiling :
 #
