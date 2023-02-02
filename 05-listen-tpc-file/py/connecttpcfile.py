@@ -14,7 +14,7 @@ except:  # pragma: no cover
 def main():
     #  Set Vars
     port = 7000
-    ip = "127.0.0.1"
+    ip = "127.0.0.10"
 
     #  Parse arguments
     parser = argparse.ArgumentParser(description="Command Line Connect to tpc port")
@@ -43,14 +43,26 @@ def connectport(port, ip, FILE):
     # Connect to the server
     client_socket.connect((ip, port))
 
+    local_name = client_socket.getsockname()
+    print("Local socket name:", local_name)
+
+    peer_name = client_socket.getpeername()
+    print("Peer socket name:", peer_name)
+
     # open the file to be sent
     file = open(FILE, "rb")
 
-    # read the file and send it through the socket
-    file_data = (FILE+'\0').encode() + file.read()
-    while file_data:
-        client_socket.sendall(file_data)
-        file_data = file.read()
+    print("Send file:", FILE)
+
+    file_name_len = len(FILE)
+    client_socket.sendall(file_name_len.to_bytes(4, byteorder='big'))
+    client_socket.sendall(FILE.encode())
+        
+    with open(FILE, 'rb') as f:
+        client_socket.sendall(f.read())
+
+    confirmation = client_socket.recv(1024)
+    print(f'Received: {confirmation.decode()}')
 
     # close the socket and file
     client_socket.close()

@@ -120,27 +120,59 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
  *******************************************************************/
 void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
 {
+    static int file_name_len = 0;
+    static int file_len = 0;
+    static char file_name[100];
+    // static int file_data_len = 0;
+    // static char *file_data = NULL;
+
+    if(nread == UV_EOF) {
+
+        /* El final de los datos se ha alcanzado */
+        uv_read_stop(client);
+        return;
+    }
+
     if(nread < 0) {
         if(nread != UV_EOF)
             fprintf(stderr, "Read error %s\n", uv_err_name(nread));
         uv_close((uv_handle_t *)client, NULL);
         return;
     }
+
     if(nread > 0) {
 
-        char *filename = (char *)buf->base;
-        int i = 0;
-        while(filename[i] != '\0') {
-            i++;
+        if(file_name_len == 0) {
+            memcpy(&file_name_len, buf->base, 4);
+            file_name_len = ntohl(file_name_len);
+            memcpy(file_name, buf->base + 4, file_name_len);
+            file_name[file_name_len] = '\0';
+            // printf("Nombre del archivo: %s\n", file_name);
+            // printf("file_name_len: %i\n", file_name_len);
+
+        } else if(file_len == 0) {
+            memcpy(&file_len, buf->base, 4);
+            file_len = ntohl(file_len);
+            // file_data = (char *)malloc(file_len);
+            // printf("file_len: %i \n", file_len);
         }
-        char file[i];
-        strncpy(file, filename, i);
 
-        FILE *fp = fopen(filename, "w+");
-        fwrite(buf->base + i + 1, sizeof(char), nread - i - 1, fp);
-        fclose(fp);
+        if(file_len != 0) {
+            FILE *file = fopen(file_name, "a");
+            fwrite(buf->base, 1, nread, file);
+            fclose(file);
+            // printf("Data received: %ld bytes\n", nread);
+        }
 
-        printf("Received %d bytes and saved as %s\n", (int)nread, filename);
+        if(file_len != 0 && buf->len > nread) {
+            printf("file: %s\n", file_name);
+            /* Send Confirmation. */
+            uv_write_t *req = malloc(sizeof(uv_write_t));
+            uv_buf_t buf = uv_buf_init("OK\n", 4);
+            uv_write(req, (uv_stream_t *)client, &buf, 1, NULL);
+            file_name_len = 0;
+            file_len = 0;
+        }
     }
     free(buf->base);
 }
@@ -159,6 +191,30 @@ void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 }
 
 /*****************************************************************
+ *  get peername sockname
+ *****************************************************************/
+
+void get_peer_and_sock(uv_tcp_t *client)
+{
+    char client_ip[17] = {0};
+    int client_port = 0;
+    struct sockaddr_in client_addr;
+    int len = sizeof(client_addr);
+    uv_tcp_getpeername(client, (struct sockaddr *)&client_addr, &len);
+    uv_inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
+    client_port = ntohs(client_addr.sin_port);
+    printf("Peer name: %s:%d\n", client_ip, client_port);
+
+    len = sizeof(addr);
+    uv_tcp_getsockname(client, (struct sockaddr *)&addr, &len);
+    char server_ip[17] = {0};
+    int server_port = 0;
+    uv_inet_ntop(AF_INET, &addr.sin_addr, server_ip, sizeof(server_ip));
+    server_port = ntohs(addr.sin_port);
+    printf("Sock name: %s:%d\n", server_ip, server_port);
+}
+
+/*****************************************************************
  *  On Conection
  *****************************************************************/
 void on_connect(uv_stream_t *server, int status)
@@ -172,7 +228,10 @@ void on_connect(uv_stream_t *server, int status)
     uv_tcp_init(loop, client);
 
     if(uv_accept(server, (uv_stream_t *)client) == 0) {
+
+        get_peer_and_sock(client);
         uv_read_start((uv_stream_t *)client, alloc_buffer, on_read);
+
     } else {
         uv_close((uv_handle_t *)client, NULL);
     }
@@ -188,7 +247,7 @@ int main(int argc, char *argv[])
     /*Default values*/
     memset(&arguments, 0, sizeof(arguments));
     arguments.port = 7000;
-    arguments.ip = "127.0.0.1";
+    arguments.ip = "127.0.0.10";
 
     /*Parse arguments*/
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
