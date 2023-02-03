@@ -49,24 +49,23 @@ def connectport(port, ip, FILE):
     peer_name = client_socket.getpeername()
     print("Peer socket name:", peer_name)
 
-    # open the file to be sent
-    file = open(FILE, "rb")
-
     print("Send file:", FILE)
 
     file_name_len = len(FILE)
     client_socket.sendall(file_name_len.to_bytes(4, byteorder='big'))
     client_socket.sendall(FILE.encode())
-        
-    with open(FILE, 'rb') as f:
-        client_socket.sendall(f.read())
 
     confirmation = client_socket.recv(1024)
     print(f'Received: {confirmation.decode()}')
+    if (confirmation.decode()=="createOK"):    
+        with open(FILE, 'rb') as f:
+            client_socket.sendall(f.read())
 
-    # close the socket and file
+        confirmation = client_socket.recv(1024)
+        print(f'Received: {confirmation.decode()}')
+
+            # close the socket and file
     client_socket.close()
-    file.close()
     
 
 ##########################

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <uv.h>
 
 uv_loop_t *loop;
@@ -134,6 +135,7 @@ void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
     }
 
     if(nread < 0) {
+        /* Error */
         if(nread != UV_EOF)
             fprintf(stderr, "Read error %s\n", uv_err_name(nread));
         uv_close((uv_handle_t *)client, NULL);
@@ -143,14 +145,33 @@ void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
     if(nread > 0) {
 
         if(file_name_len == 0) {
+            /* se recibe de nombre de fichero*/
             memcpy(&file_name_len, buf->base, 4);
             file_name_len = ntohl(file_name_len);
             memcpy(file_name, buf->base + 4, file_name_len);
             file_name[file_name_len] = '\0';
+
             // printf("Nombre del archivo: %s\n", file_name);
             // printf("file_name_len: %i\n", file_name_len);
 
+            /* Verificacion de existencia de archivo*/
+            if(access(file_name, F_OK) == 0) {
+                printf("File %s exists. \n", file_name);
+                /* Send Confirmation. */
+                uv_write_t *req = malloc(sizeof(uv_write_t));
+                uv_buf_t buf = uv_buf_init("createError\n", 13);
+                uv_write(req, (uv_stream_t *)client, &buf, 1, NULL);
+                file_name_len = 0;
+                file_len = 0;
+            } else {
+                // printf("El archivo %s no existe\n", file_name);
+                uv_write_t *req = malloc(sizeof(uv_write_t));
+                uv_buf_t buf = uv_buf_init("createOK\n", 8);
+                uv_write(req, (uv_stream_t *)client, &buf, 1, NULL);
+            }
+
         } else if(file_len == 0) {
+            /* Se recibe tamaño de fichero*/
             memcpy(&file_len, buf->base, 4);
             file_len = ntohl(file_len);
             // file_data = (char *)malloc(file_len);
@@ -158,6 +179,7 @@ void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
         }
 
         if(file_len != 0) {
+            /* Se guarda el fichero*/
             FILE *file = fopen(file_name, "a");
             fwrite(buf->base, 1, nread, file);
             fclose(file);
@@ -165,7 +187,8 @@ void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
         }
 
         if(file_len != 0 && buf->len > nread) {
-            printf("file: %s\n", file_name);
+            /* Se confirma fin de datos*/
+            printf("file receive: %s\n", file_name);
             /* Send Confirmation. */
             uv_write_t *req = malloc(sizeof(uv_write_t));
             uv_buf_t buf = uv_buf_init("OK\n", 4);
