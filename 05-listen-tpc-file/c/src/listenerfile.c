@@ -2,11 +2,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <uv.h>
 
 uv_loop_t *loop;
 struct sockaddr_in addr;
+FILE *file;
+static int file_name_len = 0;
+static int file_len = 0;
+static char file_name[100];
 
 /***************************************************************************
  *      Structures
@@ -121,9 +126,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
  *******************************************************************/
 void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
 {
-    static int file_name_len = 0;
-    static int file_len = 0;
-    static char file_name[100];
+
     // static int file_data_len = 0;
     // static char *file_data = NULL;
 
@@ -159,16 +162,17 @@ void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
                 printf("File %s exists. \n", file_name);
                 /* Send Confirmation. */
                 uv_write_t *req = malloc(sizeof(uv_write_t));
-                uv_buf_t buf = uv_buf_init("createError\n", 13);
+                uv_buf_t buf = uv_buf_init("overwritingFile\n", 15);
                 uv_write(req, (uv_stream_t *)client, &buf, 1, NULL);
-                file_name_len = 0;
-                file_len = 0;
+                remove(file_name);
             } else {
                 // printf("El archivo %s no existe\n", file_name);
                 uv_write_t *req = malloc(sizeof(uv_write_t));
                 uv_buf_t buf = uv_buf_init("createOK\n", 8);
                 uv_write(req, (uv_stream_t *)client, &buf, 1, NULL);
             }
+
+            file = fopen(file_name, "a");
 
         } else if(file_len == 0) {
             /* Se recibe tamaño de fichero*/
@@ -180,9 +184,9 @@ void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
 
         if(file_len != 0) {
             /* Se guarda el fichero*/
-            FILE *file = fopen(file_name, "a");
+            // FILE *file = fopen(file_name, "a");
             fwrite(buf->base, 1, nread, file);
-            fclose(file);
+
             // printf("Data received: %ld bytes\n", nread);
         }
 
@@ -195,6 +199,9 @@ void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
             uv_write(req, (uv_stream_t *)client, &buf, 1, NULL);
             file_name_len = 0;
             file_len = 0;
+            fclose(file);
+
+            usleep(55000);
         }
     }
     free(buf->base);
@@ -270,7 +277,7 @@ int main(int argc, char *argv[])
     /*Default values*/
     memset(&arguments, 0, sizeof(arguments));
     arguments.port = 7000;
-    arguments.ip = "127.0.0.10";
+    arguments.ip = "127.0.0.4";
 
     /*Parse arguments*/
     argp_parse(&argp, argc, argv, 0, 0, &arguments);

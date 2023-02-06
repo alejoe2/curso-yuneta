@@ -14,7 +14,8 @@ except:  # pragma: no cover
 def main():
     #  Set Vars
     port = 7000
-    ip = "127.0.0.10"
+    ip = "127.0.0.4"
+    repeat = 2
 
     #  Parse arguments
     parser = argparse.ArgumentParser(description="Command Line Connect to tpc port")
@@ -22,6 +23,7 @@ def main():
     group1 = parser.add_argument_group('options for execution')
     group1.add_argument("-p", "--port", help="define port to use, default port=7000", type=int, default=port)
     group1.add_argument("-i", "--ip", help="define ip to use, default ip='127.0.0.1'", type=str, default=ip)
+    group1.add_argument("-r", "--repeat", help="Repeat execution 'Hello World' times. Default repeat=2", type=int, default=repeat)
     group1.add_argument("FILE", help="FILE to send, defaul=file.txt ", type=str)
     args = parser.parse_args()
 
@@ -29,13 +31,15 @@ def main():
         port = args.port
     if args.ip:
         ip = args.ip
+    if args.repeat:
+        repeat = args.repeat
 
-    connectport(port, ip, args.FILE)
+    connectport(port, ip, args.FILE, repeat)
 
 ##########################
 #      Conection Port
 ##########################
-def connectport(port, ip, FILE):
+def connectport(port, ip, FILE, repeat):
     
     # Create a socket object
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -49,22 +53,24 @@ def connectport(port, ip, FILE):
     peer_name = client_socket.getpeername()
     print("Peer socket name:", peer_name)
 
-    print("Send file:", FILE)
+    for i in range(1, repeat+1):
 
-    file_name_len = len(FILE)
-    client_socket.sendall(file_name_len.to_bytes(4, byteorder='big'))
-    client_socket.sendall(FILE.encode())
+        print("Send file:", FILE)
 
-    confirmation = client_socket.recv(1024)
-    print(f'Received: {confirmation.decode()}')
-    if (confirmation.decode()=="createOK"):    
-        with open(FILE, 'rb') as f:
-            client_socket.sendall(f.read())
+        file_name_len = len(FILE)
+        client_socket.sendall(file_name_len.to_bytes(4, byteorder='big'))
+        client_socket.sendall(FILE.encode())
 
-        confirmation = client_socket.recv(1024)
-        print(f'Received: {confirmation.decode()}')
+        confirmation = client_socket.recv(1024).decode()
+        print(f'Received: {confirmation}')
+        if (confirmation=="createOK" or confirmation=="overwritingFile" ):
+            with open(FILE, 'rb') as f:
+                client_socket.sendall(f.read())
 
-            # close the socket and file
+            confirmation = client_socket.recv(1024)
+            print(f'Received: {confirmation.decode()}')
+
+                # close the socket and file
     client_socket.close()
     
 
