@@ -2,6 +2,7 @@
 
 import argparse
 import socket
+import os
 
 try:
     from . import __version__
@@ -14,8 +15,8 @@ except:  # pragma: no cover
 def main():
     #  Set Vars
     port = 7000
-    ip = "127.0.0.4"
-    repeat = 2
+    ip = "127.0.0.12"
+    repeat = 1
 
     #  Parse arguments
     parser = argparse.ArgumentParser(description="Command Line Connect to tpc port")
@@ -59,18 +60,23 @@ def connectport(port, ip, FILE, repeat):
 
         file_name_len = len(FILE)
         client_socket.sendall(file_name_len.to_bytes(4, byteorder='big'))
+        
+        file_size = os.path.getsize(FILE)
+        print("file_size:", file_size)
+        client_socket.sendall(len(str(file_size)).to_bytes(4, byteorder='big'))
+
         client_socket.sendall(FILE.encode())
+        client_socket.sendall(str(file_size).encode())
 
-        confirmation = client_socket.recv(1024).decode()
-        print(f'Received: {confirmation}')
-        if (confirmation=="createOK" or confirmation=="overwritingFile" ):
-            with open(FILE, 'rb') as f:
-                client_socket.sendall(f.read())
+        with open(FILE, 'rb') as f:
+            client_socket.sendall(f.read())
 
-            confirmation = client_socket.recv(1024)
-            print(f'Received: {confirmation.decode()}')
+        
 
-                # close the socket and file
+        #confirmation = client_socket.recv(1024)
+        #print(f'Received: {confirmation.decode()}')
+
+    # close the socket
     client_socket.close()
     
 
