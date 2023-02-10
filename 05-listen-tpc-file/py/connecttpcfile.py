@@ -15,7 +15,7 @@ except:  # pragma: no cover
 def main():
     #  Set Vars
     port = 7000
-    ip = "127.0.0.12"
+    ip = "127.0.0.1"
     repeat = 1
 
     #  Parse arguments
