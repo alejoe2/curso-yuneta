@@ -2,10 +2,52 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
-#include <uv.h>
+#include <ghelpers.h>
 
+
+/***************************************************************************
+ *      Prototypes
+ ***************************************************************************/
+void get_peer_and_sock(uv_tcp_t *client);
+void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf);
+void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf);
+static error_t parse_opt(int key, char *arg, struct argp_state *state);
+void on_close(uv_handle_t *handle);
+
+/***************************************************************************
+ *      Structures
+ *      4 + 4 + filename + filecontent
+ ***************************************************************************/
+typedef enum {
+    ST_WAIT_HEADER,
+    ST_WAIT_FILENAME,
+    ST_WAIT_CONTENT
+} state_t;
+
+#pragma pack(1)
+typedef struct header_s {
+    uint32_t *filename_length;
+    uint32_t file_length;
+} header_t;
+#pragma pack()
+
+typedef struct client_s {
+    header_t header;
+    char filename[256];
+
+    GBUFFER *gbuf_header;
+    GBUFFER *gbuf_filename;
+    GBUFFER *gbuf_content;
+
+    uv_tcp_t *uv;
+    int fp;
+    state_t state;
+} client_t;
+
+/***************************************************************************
+ *      Data
+ ***************************************************************************/
 uv_loop_t *loop;
 struct sockaddr_in addr;
 FILE *file;
@@ -13,9 +55,8 @@ static int file_name_len = 0;
 static int file_len = 0;
 static char file_name[100];
 
-/***************************************************************************
- *      Structures
- ***************************************************************************/
+#define programfile "listenerfile"
+
 
 /*
  *  Used by main to communicate with parse_opt.
@@ -28,17 +69,6 @@ struct arguments
     int port;
     char *ip;
 };
-
-/***************************************************************************
- *              Prototypes
- ***************************************************************************/
-static error_t parse_opt(int key, char *arg, struct argp_state *state);
-
-/***************************************************************************
- *      Data
- ***************************************************************************/
-
-// entry_point()
 
 /* Program documentation. */
 static char doc[] = "Listen in a tcp port and receive file";
@@ -122,89 +152,173 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 }
 
 /*******************************************************************
+ *  New client
+ *******************************************************************/
+int new_client(uv_tcp_t *uv_tcp)
+{
+    client_t *client = malloc(sizeof(client_t));
+    if(!client) {
+        log_error(LOG_OPT_TRACE_STACK, "%s: No memory", programfile);
+        //uv_close(uv_tcp); // TODO
+        return -1;
+    }
+    memset(client, 0, sizeof(client_t));
+
+    uv_tcp->data = client;
+    client->uv = uv_tcp;
+
+    client->gbuf_header = gbuf_create(sizeof(header_t), sizeof(header_t), 0, 0);
+    if(!client->gbuf_header) {
+        // log_error TODO desconectar
+        return -1;
+    }
+
+    get_peer_and_sock(uv_tcp);
+    uv_read_start((uv_stream_t *)uv_tcp, alloc_buffer, on_read);
+
+    return 0;
+}
+
+/*******************************************************************
+ *  Free client
+ *******************************************************************/
+int free_client(client_t *client)
+{
+    // TODO revisar cuando hay que liberar free(buf->base);
+
+    if(client->file) {
+        fclose(client->file);
+        client->file = 0;
+    }
+    if(client->gbuf_header) {
+        GBUF_DECREF(client->gbuf_header)
+    }
+    if(client->gbuf_content) {
+        GBUF_DECREF(client->gbuf_content)
+    }
+    if(client->gbuf_filename) {
+        GBUF_DECREF(client->gbuf_filename)
+    }
+
+    free(client);
+}
+
+/*******************************************************************
  *  On Read
  *******************************************************************/
-void on_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
+int process_data(client_t *client, char *bf, size_t bflen)
 {
+    while(bflen > 0) {
+        switch(client->state) {
+            case ST_WAIT_HEADER:
+                {
+                    size_t written = gbuf_append(client->gbuf_header, bf, bflen);
+                    bflen -= written;
+                    bf += written;
 
-    // static int file_data_len = 0;
-    // static char *file_data = NULL;
+                    if(gbuf_totalbytes(client->gbuf_header) == sizeof(header_t)) {
+                        client->header.filename_length = gbuf_get(client->gbuf_header, sizeof(uint32_t));
+                        *client->header.filename_length = htonl(*client->header.filename_length);
+
+                        memmove(
+                            &client->header.file_length,
+                            gbuf_get(client->gbuf_header, sizeof(uint32_t)),
+                            sizeof(uint32_t)
+                        );
+                        client->header.file_length = htonl(client->header.file_length);
+
+                        client->gbuf_filename = gbuf_create(
+                            *client->header.filename_length,
+                            *client->header.filename_length,
+                            0,
+                            0
+                        );
+                        if(!client->gbuf_filename) {
+                            // TODO log_error
+                            return -1;
+                        }
+
+                        client->gbuf_content = gbuf_create(4*1024, client->header.file_length, 0, 0);
+                        if(!client->gbuf_content) {
+                            // TODO log_error
+                            return -1;
+                        }
+
+                        client->state = ST_WAIT_FILENAME;
+                    }
+                }
+                break;
+
+            case ST_WAIT_FILENAME:
+                {
+                    size_t written = gbuf_append(client->gbuf_filename, bf, bflen);
+                    bflen -= written;
+                    bf += written;
+                    if(gbuf_totalbytes(client->gbuf_filename) == *client->header.filename_length) {
+                        // TODO create file
+                        //client->fp = open()
+
+                        client->state = ST_WAIT_CONTENT;
+                    }
+                }
+                break;
+
+            case ST_WAIT_CONTENT:
+                {
+                    size_t written = gbuf_append(client->gbuf_content, bf, bflen);
+                    bflen -= written;
+                    bf += written;
+                    if(gbuf_totalbytes(client->gbuf_content) == client->header.file_length) {
+                        // TODO create file
+                        write(
+                            client->fp,
+                            gbuf_cur_rd_pointer(client->gbuf_content),
+                            client->header.file_length
+                        );
+                        close(client->fp);
+                        client->fp = -1;
+
+                        GBUF_DECREF(client->gbuf_content)
+                        GBUF_DECREF(client->gbuf_filename)
+                        gbuf_clear(client->gbuf_header);
+
+                        client->state = ST_WAIT_HEADER;
+                    }
+                }
+                break;
+        }
+    }
+
+    return 0;
+}
+
+/*******************************************************************
+ *  On Read
+ *******************************************************************/
+void on_read(uv_stream_t *uv_stream, ssize_t nread, const uv_buf_t *buf)
+{
+    client_t *client = uv_stream->data;
 
     if(nread == UV_EOF) {
-
         /* El final de los datos se ha alcanzado */
-        uv_read_stop(client);
+        uv_read_stop(uv_stream);
         return;
     }
 
     if(nread < 0) {
         /* Error */
-        if(nread != UV_EOF)
-            fprintf(stderr, "Read error %s\n", uv_err_name(nread));
-        uv_close((uv_handle_t *)client, NULL);
+        fprintf(stderr, "Read error %s\n", uv_err_name(nread));
+        uv_close((uv_handle_t *)uv_stream, on_close);
         return;
     }
 
     if(nread > 0) {
-
-        if(file_name_len == 0) {
-            /* se recibe de nombre de fichero*/
-            memcpy(&file_name_len, buf->base, 4);
-            file_name_len = ntohl(file_name_len);
-            memcpy(file_name, buf->base + 4, file_name_len);
-            file_name[file_name_len] = '\0';
-
-            // printf("Nombre del archivo: %s\n", file_name);
-            // printf("file_name_len: %i\n", file_name_len);
-
-            /* Verificacion de existencia de archivo*/
-            if(access(file_name, F_OK) == 0) {
-                printf("File %s exists. \n", file_name);
-                /* Send Confirmation. */
-                uv_write_t *req = malloc(sizeof(uv_write_t));
-                uv_buf_t buf = uv_buf_init("overwritingFile\n", 15);
-                uv_write(req, (uv_stream_t *)client, &buf, 1, NULL);
-                remove(file_name);
-            } else {
-                // printf("El archivo %s no existe\n", file_name);
-                uv_write_t *req = malloc(sizeof(uv_write_t));
-                uv_buf_t buf = uv_buf_init("createOK\n", 8);
-                uv_write(req, (uv_stream_t *)client, &buf, 1, NULL);
-            }
-
-            file = fopen(file_name, "a");
-
-        } else if(file_len == 0) {
-            /* Se recibe tamaño de fichero*/
-            memcpy(&file_len, buf->base, 4);
-            file_len = ntohl(file_len);
-            // file_data = (char *)malloc(file_len);
-            // printf("file_len: %i \n", file_len);
-        }
-
-        if(file_len != 0) {
-            /* Se guarda el fichero*/
-            // FILE *file = fopen(file_name, "a");
-            fwrite(buf->base, 1, nread, file);
-
-            // printf("Data received: %ld bytes\n", nread);
-        }
-
-        if(file_len != 0 && buf->len > nread) {
-            /* Se confirma fin de datos*/
-            printf("file receive: %s\n", file_name);
-            /* Send Confirmation. */
-            uv_write_t *req = malloc(sizeof(uv_write_t));
-            uv_buf_t buf = uv_buf_init("OK\n", 4);
-            uv_write(req, (uv_stream_t *)client, &buf, 1, NULL);
-            file_name_len = 0;
-            file_len = 0;
-            fclose(file);
-
-            usleep(55000);
+        if(process_data(client, buf->base, nread)<0) {
+            uv_close((uv_handle_t *)uv_stream, on_close);
         }
     }
-    free(buf->base);
+
+    //    free(buf->base);
 }
 
 /*****************************************************************
@@ -223,7 +337,6 @@ void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 /*****************************************************************
  *  get peername sockname
  *****************************************************************/
-
 void get_peer_and_sock(uv_tcp_t *client)
 {
     char client_ip[17] = {0};
@@ -245,7 +358,17 @@ void get_peer_and_sock(uv_tcp_t *client)
 }
 
 /*****************************************************************
- *  On Conection
+ *
+ *****************************************************************/
+void on_close(uv_handle_t *handle)
+{
+    client_t *client = handle->data;
+    free_client(client);
+    free(handle);
+}
+
+/*****************************************************************
+ *  On Connection
  *****************************************************************/
 void on_connect(uv_stream_t *server, int status)
 {
@@ -254,16 +377,16 @@ void on_connect(uv_stream_t *server, int status)
         return;
     }
 
-    uv_tcp_t *client = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
-    uv_tcp_init(loop, client);
+    uv_tcp_t *uv_tcp = (uv_tcp_t *)malloc(sizeof(uv_tcp_t));
+    uv_tcp_init(loop, uv_tcp);
 
-    if(uv_accept(server, (uv_stream_t *)client) == 0) {
-
-        get_peer_and_sock(client);
-        uv_read_start((uv_stream_t *)client, alloc_buffer, on_read);
+    if(uv_accept(server, (uv_stream_t *)uv_tcp) == 0) {
+        if(new_client(uv_tcp)<0) {
+            // log_error() TODO
+        }
 
     } else {
-        uv_close((uv_handle_t *)client, NULL);
+        uv_close((uv_handle_t *)client, on_close);
     }
 }
 
@@ -273,6 +396,8 @@ void on_connect(uv_stream_t *server, int status)
 int main(int argc, char *argv[])
 {
     struct arguments arguments;
+
+    init_ghelpers_library(programfile);
 
     /*Default values*/
     memset(&arguments, 0, sizeof(arguments));
@@ -295,5 +420,8 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Listen error %s\n", uv_strerror(r));
         return 1;
     }
-    return uv_run(loop, UV_RUN_DEFAULT);
+
+    uv_run(loop, UV_RUN_DEFAULT);
+
+    end_ghelpers_library();
 }

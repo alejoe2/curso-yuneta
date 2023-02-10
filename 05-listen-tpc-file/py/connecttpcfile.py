@@ -59,20 +59,23 @@ def connectport(port, ip, FILE, repeat):
 
         print("Send file:", FILE)
 
+        # Envía longitud nombre fichero
         file_name_len = len(FILE)
-        client_socket.sendall(file_name_len.to_bytes(4, byteorder='big'))
+        to_send = file_name_len.to_bytes(4, byteorder='big')
+        client_socket.sendall(to_send)
 
+        # Envía longitud fichero
         file_size = os.path.getsize(FILE)
         print("file_size:", file_size)
-        client_socket.sendall(len(str(file_size)).to_bytes(4, byteorder='big'))
+        to_send = file_size.to_bytes(4, byteorder='big')
+        client_socket.sendall(to_send)
 
+        # Envía nombre fichero
         client_socket.sendall(FILE.encode())
-        client_socket.sendall(str(file_size).encode())
 
+        # Envía fichero
         with open(FILE, 'rb') as f:
             client_socket.sendall(f.read())
-
-
 
         #confirmation = client_socket.recv(1024)
         #print(f'Received: {confirmation.decode()}')

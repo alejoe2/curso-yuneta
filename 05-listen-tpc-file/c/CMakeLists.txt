@@ -33,6 +33,8 @@ else(HAVE_REGEX_H)
     message("***  WARNING: GNU C regex library not found.")
 endif(HAVE_REGEX_H)
 
+include_directories(/yuneta/development/output/include)
+
 ##############################################
 #   Source
 ##############################################
@@ -47,8 +49,12 @@ add_executable(listenerfile ${listenerfile})
 set_target_properties(listenerfile PROPERTIES OUTPUT_NAME listenerfile)
 
 TARGET_LINK_LIBRARIES(listenerfile
+    /yuneta/development/output/lib/libginsfsm.a
+    /yuneta/development/output/lib/libghelpers.a
+    /yuneta/development/output/lib/libjansson.a
     /yuneta/development/output/lib/libuv.a
-
+    /yuneta/development/output/lib/libpcre2-8.a
+    /yuneta/development/output/lib/libunwind.a
     pthread dl  # used by libuv
     lzma        # used by libunwind
     z rt m
