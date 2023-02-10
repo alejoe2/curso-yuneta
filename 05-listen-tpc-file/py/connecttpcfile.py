@@ -37,11 +37,12 @@ def main():
 
     connectport(port, ip, args.FILE, repeat)
 
+
 ##########################
-#      Conection Port
+#      Connection Port
 ##########################
 def connectport(port, ip, FILE, repeat):
-    
+
     # Create a socket object
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -60,7 +61,7 @@ def connectport(port, ip, FILE, repeat):
 
         file_name_len = len(FILE)
         client_socket.sendall(file_name_len.to_bytes(4, byteorder='big'))
-        
+
         file_size = os.path.getsize(FILE)
         print("file_size:", file_size)
         client_socket.sendall(len(str(file_size)).to_bytes(4, byteorder='big'))
@@ -71,17 +72,17 @@ def connectport(port, ip, FILE, repeat):
         with open(FILE, 'rb') as f:
             client_socket.sendall(f.read())
 
-        
+
 
         #confirmation = client_socket.recv(1024)
         #print(f'Received: {confirmation.decode()}')
 
     # close the socket
     client_socket.close()
-    
+
 
 ##########################
-#      
+#
 ##########################
 if __name__ == "__main__":
     main()
