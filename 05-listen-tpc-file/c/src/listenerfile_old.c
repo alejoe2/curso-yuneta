@@ -1,4 +1,5 @@
 #include <argp.h>
+#include <fcntl.h>
 #include <ghelpers.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -164,7 +165,7 @@ int new_client(uv_tcp_t *uv_tcp)
     uv_tcp->data = client;
     client->uv = uv_tcp;
 
-    client->gbuf_header = gbuf_create(sizeof(header_t), sizeof(header_t), 0, 0);
+    client->gbuf_header = gbuf_create(8, 8, 0, 0);
     if(!client->gbuf_header) {
         // log_error TODO desconectar
         return -1;
@@ -212,7 +213,7 @@ int process_data(client_t *client, char *bf, size_t bflen)
             bflen -= written;
             bf += written;
 
-            if(gbuf_totalbytes(client->gbuf_header) == sizeof(header_t)) {
+            if(gbuf_totalbytes(client->gbuf_header) == 8) {
                 client->header.filename_length = gbuf_get(client->gbuf_header, sizeof(uint32_t));
                 *client->header.filename_length = htonl(*client->header.filename_length);
 
@@ -247,10 +248,15 @@ int process_data(client_t *client, char *bf, size_t bflen)
             bflen -= written;
             bf += written;
             if(gbuf_totalbytes(client->gbuf_filename) == *client->header.filename_length) {
-                // TODO create file
-                client->fp = open(client->filename, O_TRUNC);
 
+                memmove(
+                    client->filename,
+                    gbuf_get(client->gbuf_filename, *client->header.filename_length),
+                    *client->header.filename_length);
+
+                client->fp = open(client->filename, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | O_TRUNC);
                 client->state = ST_WAIT_CONTENT;
+                printf("FILENAME: %s\n", client->filename);
             }
         } break;
 
@@ -259,7 +265,7 @@ int process_data(client_t *client, char *bf, size_t bflen)
             bflen -= written;
             bf += written;
             if(gbuf_totalbytes(client->gbuf_content) == client->header.file_length) {
-                // TODO create file
+
                 write(
                     client->fp,
                     gbuf_cur_rd_pointer(client->gbuf_content),
@@ -306,7 +312,7 @@ void on_read(uv_stream_t *uv_stream, ssize_t nread, const uv_buf_t *buf)
         }
     }
 
-    //    free(buf->base);
+    //free(buf->base);
 }
 
 /*****************************************************************
@@ -412,4 +418,5 @@ int main(int argc, char *argv[])
     uv_run(loop, UV_RUN_DEFAULT);
 
     end_ghelpers_library();
+    return 0;
 }
