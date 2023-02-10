@@ -37,7 +37,7 @@ endif(HAVE_REGEX_H)
 #   Source
 ##############################################
 SET (listenerfile
-    src/listenerfile.c
+    src/listenerfile_old.c
 )
 
 ##############################################

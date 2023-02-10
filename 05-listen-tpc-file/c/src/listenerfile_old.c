@@ -277,7 +277,7 @@ int main(int argc, char *argv[])
     /*Default values*/
     memset(&arguments, 0, sizeof(arguments));
     arguments.port = 7000;
-    arguments.ip = "127.0.0.4";
+    arguments.ip = "127.0.0.1";
 
     /*Parse arguments*/
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
