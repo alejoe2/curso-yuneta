@@ -1,10 +1,9 @@
 #include <argp.h>
+#include <ghelpers.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <ghelpers.h>
-
 
 /***************************************************************************
  *      Prototypes
@@ -19,20 +18,23 @@ void on_close(uv_handle_t *handle);
  *      Structures
  *      4 + 4 + filename + filecontent
  ***************************************************************************/
-typedef enum {
+typedef enum
+{
     ST_WAIT_HEADER,
     ST_WAIT_FILENAME,
     ST_WAIT_CONTENT
 } state_t;
 
 #pragma pack(1)
-typedef struct header_s {
+typedef struct header_s
+{
     uint32_t *filename_length;
     uint32_t file_length;
 } header_t;
 #pragma pack()
 
-typedef struct client_s {
+typedef struct client_s
+{
     header_t header;
     char filename[256];
 
@@ -50,13 +52,8 @@ typedef struct client_s {
  ***************************************************************************/
 uv_loop_t *loop;
 struct sockaddr_in addr;
-FILE *file;
-static int file_name_len = 0;
-static int file_len = 0;
-static char file_name[100];
 
 #define programfile "listenerfile"
-
 
 /*
  *  Used by main to communicate with parse_opt.
@@ -159,7 +156,7 @@ int new_client(uv_tcp_t *uv_tcp)
     client_t *client = malloc(sizeof(client_t));
     if(!client) {
         log_error(LOG_OPT_TRACE_STACK, "%s: No memory", programfile);
-        //uv_close(uv_tcp); // TODO
+        // uv_close(uv_tcp); // TODO
         return -1;
     }
     memset(client, 0, sizeof(client_t));
@@ -182,13 +179,13 @@ int new_client(uv_tcp_t *uv_tcp)
 /*******************************************************************
  *  Free client
  *******************************************************************/
-int free_client(client_t *client)
+void free_client(client_t *client)
 {
     // TODO revisar cuando hay que liberar free(buf->base);
 
-    if(client->file) {
-        fclose(client->file);
-        client->file = 0;
+    if(client->fp) {
+        close(client->fp);
+        client->fp = 0;
     }
     if(client->gbuf_header) {
         GBUF_DECREF(client->gbuf_header)
@@ -210,82 +207,73 @@ int process_data(client_t *client, char *bf, size_t bflen)
 {
     while(bflen > 0) {
         switch(client->state) {
-            case ST_WAIT_HEADER:
-                {
-                    size_t written = gbuf_append(client->gbuf_header, bf, bflen);
-                    bflen -= written;
-                    bf += written;
+        case ST_WAIT_HEADER: {
+            size_t written = gbuf_append(client->gbuf_header, bf, bflen);
+            bflen -= written;
+            bf += written;
 
-                    if(gbuf_totalbytes(client->gbuf_header) == sizeof(header_t)) {
-                        client->header.filename_length = gbuf_get(client->gbuf_header, sizeof(uint32_t));
-                        *client->header.filename_length = htonl(*client->header.filename_length);
+            if(gbuf_totalbytes(client->gbuf_header) == sizeof(header_t)) {
+                client->header.filename_length = gbuf_get(client->gbuf_header, sizeof(uint32_t));
+                *client->header.filename_length = htonl(*client->header.filename_length);
 
-                        memmove(
-                            &client->header.file_length,
-                            gbuf_get(client->gbuf_header, sizeof(uint32_t)),
-                            sizeof(uint32_t)
-                        );
-                        client->header.file_length = htonl(client->header.file_length);
+                memmove(
+                    &client->header.file_length,
+                    gbuf_get(client->gbuf_header, sizeof(uint32_t)),
+                    sizeof(uint32_t));
+                client->header.file_length = htonl(client->header.file_length);
 
-                        client->gbuf_filename = gbuf_create(
-                            *client->header.filename_length,
-                            *client->header.filename_length,
-                            0,
-                            0
-                        );
-                        if(!client->gbuf_filename) {
-                            // TODO log_error
-                            return -1;
-                        }
-
-                        client->gbuf_content = gbuf_create(4*1024, client->header.file_length, 0, 0);
-                        if(!client->gbuf_content) {
-                            // TODO log_error
-                            return -1;
-                        }
-
-                        client->state = ST_WAIT_FILENAME;
-                    }
+                client->gbuf_filename = gbuf_create(
+                    *client->header.filename_length,
+                    *client->header.filename_length,
+                    0,
+                    0);
+                if(!client->gbuf_filename) {
+                    // TODO log_error
+                    return -1;
                 }
-                break;
 
-            case ST_WAIT_FILENAME:
-                {
-                    size_t written = gbuf_append(client->gbuf_filename, bf, bflen);
-                    bflen -= written;
-                    bf += written;
-                    if(gbuf_totalbytes(client->gbuf_filename) == *client->header.filename_length) {
-                        // TODO create file
-                        //client->fp = open()
-
-                        client->state = ST_WAIT_CONTENT;
-                    }
+                client->gbuf_content = gbuf_create(4 * 1024, client->header.file_length, 0, 0);
+                if(!client->gbuf_content) {
+                    // TODO log_error
+                    return -1;
                 }
-                break;
 
-            case ST_WAIT_CONTENT:
-                {
-                    size_t written = gbuf_append(client->gbuf_content, bf, bflen);
-                    bflen -= written;
-                    bf += written;
-                    if(gbuf_totalbytes(client->gbuf_content) == client->header.file_length) {
-                        // TODO create file
-                        write(
-                            client->fp,
-                            gbuf_cur_rd_pointer(client->gbuf_content),
-                            client->header.file_length
-                        );
-                        close(client->fp);
-                        client->fp = -1;
+                client->state = ST_WAIT_FILENAME;
+            }
+        } break;
 
-                        GBUF_DECREF(client->gbuf_content)
-                        GBUF_DECREF(client->gbuf_filename)
-                        gbuf_clear(client->gbuf_header);
+        case ST_WAIT_FILENAME: {
+            size_t written = gbuf_append(client->gbuf_filename, bf, bflen);
+            bflen -= written;
+            bf += written;
+            if(gbuf_totalbytes(client->gbuf_filename) == *client->header.filename_length) {
+                // TODO create file
+                client->fp = open(client->filename, O_TRUNC);
 
-                        client->state = ST_WAIT_HEADER;
-                    }
-                }
-                break;
+                client->state = ST_WAIT_CONTENT;
+            }
+        } break;
+
+        case ST_WAIT_CONTENT: {
+            size_t written = gbuf_append(client->gbuf_content, bf, bflen);
+            bflen -= written;
+            bf += written;
+            if(gbuf_totalbytes(client->gbuf_content) == client->header.file_length) {
+                // TODO create file
+                write(
+                    client->fp,
+                    gbuf_cur_rd_pointer(client->gbuf_content),
+                    client->header.file_length);
+                close(client->fp);
+                client->fp = -1;
+
+                GBUF_DECREF(client->gbuf_content)
+                GBUF_DECREF(client->gbuf_filename)
+                gbuf_clear(client->gbuf_header);
+
+                client->state = ST_WAIT_HEADER;
+            }
+        } break;
         }
     }
 
@@ -313,7 +301,7 @@ void on_read(uv_stream_t *uv_stream, ssize_t nread, const uv_buf_t *buf)
     }
 
     if(nread > 0) {
-        if(process_data(client, buf->base, nread)<0) {
+        if(process_data(client, buf->base, nread) < 0) {
             uv_close((uv_handle_t *)uv_stream, on_close);
         }
     }
@@ -381,12 +369,12 @@ void on_connect(uv_stream_t *server, int status)
     uv_tcp_init(loop, uv_tcp);
 
     if(uv_accept(server, (uv_stream_t *)uv_tcp) == 0) {
-        if(new_client(uv_tcp)<0) {
+        if(new_client(uv_tcp) < 0) {
             // log_error() TODO
         }
 
     } else {
-        uv_close((uv_handle_t *)client, on_close);
+        uv_close((uv_handle_t *)server, on_close);
     }
 }
 
