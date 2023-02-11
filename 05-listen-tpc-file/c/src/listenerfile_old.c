@@ -29,7 +29,7 @@ typedef enum
 #pragma pack(1)
 typedef struct header_s
 {
-    uint32_t *filename_length;
+    uint32_t filename_length;
     uint32_t file_length;
 } header_t;
 #pragma pack()
@@ -202,7 +202,7 @@ void free_client(client_t *client)
 }
 
 /*******************************************************************
- *  On Read
+ *  On Process Data
  *******************************************************************/
 int process_data(client_t *client, char *bf, size_t bflen)
 {
@@ -213,9 +213,13 @@ int process_data(client_t *client, char *bf, size_t bflen)
             bflen -= written;
             bf += written;
 
-            if(gbuf_totalbytes(client->gbuf_header) == 8) {
-                client->header.filename_length = gbuf_get(client->gbuf_header, sizeof(uint32_t));
-                *client->header.filename_length = htonl(*client->header.filename_length);
+            if(gbuf_totalbytes(client->gbuf_header) == sizeof(header_t)) {
+
+                memmove(
+                        &client->header.filename_length,
+                        gbuf_get(client->gbuf_header, sizeof(uint32_t)),
+                        sizeof(uint32_t));
+                client->header.filename_length = htonl(client->header.filename_length);
 
                 memmove(
                     &client->header.file_length,
@@ -224,8 +228,8 @@ int process_data(client_t *client, char *bf, size_t bflen)
                 client->header.file_length = htonl(client->header.file_length);
 
                 client->gbuf_filename = gbuf_create(
-                    *client->header.filename_length,
-                    *client->header.filename_length,
+                    client->header.filename_length,
+                    client->header.filename_length,
                     0,
                     0);
                 if(!client->gbuf_filename) {
@@ -233,7 +237,7 @@ int process_data(client_t *client, char *bf, size_t bflen)
                     return -1;
                 }
 
-                client->gbuf_content = gbuf_create(4 * 1024, client->header.file_length, 0, 0);
+                client->gbuf_content = gbuf_create(2 * 1024, 0, client->header.file_length, 0);
                 if(!client->gbuf_content) {
                     // TODO log_error
                     return -1;
@@ -247,14 +251,14 @@ int process_data(client_t *client, char *bf, size_t bflen)
             size_t written = gbuf_append(client->gbuf_filename, bf, bflen);
             bflen -= written;
             bf += written;
-            if(gbuf_totalbytes(client->gbuf_filename) == *client->header.filename_length) {
+
+            if(gbuf_totalbytes(client->gbuf_filename) == client->header.filename_length) {
 
                 memmove(
                     client->filename,
-                    gbuf_get(client->gbuf_filename, *client->header.filename_length),
-                    *client->header.filename_length);
+                    gbuf_get(client->gbuf_filename, client->header.filename_length),
+                    client->header.filename_length);
 
-                client->fp = open(client->filename, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | O_TRUNC);
                 client->state = ST_WAIT_CONTENT;
                 printf("FILENAME: %s\n", client->filename);
             }
@@ -264,13 +268,10 @@ int process_data(client_t *client, char *bf, size_t bflen)
             size_t written = gbuf_append(client->gbuf_content, bf, bflen);
             bflen -= written;
             bf += written;
+
             if(gbuf_totalbytes(client->gbuf_content) == client->header.file_length) {
 
-                write(
-                    client->fp,
-                    gbuf_cur_rd_pointer(client->gbuf_content),
-                    client->header.file_length);
-                close(client->fp);
+                gbuf2file(client->gbuf_content, client->filename, 777, true);
                 client->fp = -1;
 
                 GBUF_DECREF(client->gbuf_content)
@@ -312,7 +313,7 @@ void on_read(uv_stream_t *uv_stream, ssize_t nread, const uv_buf_t *buf)
         }
     }
 
-    //free(buf->base);
+    free(buf->base);
 }
 
 /*****************************************************************

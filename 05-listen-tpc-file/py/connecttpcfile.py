@@ -25,7 +25,7 @@ def main():
     group1.add_argument("-p", "--port", help="define port to use, default port=7000", type=int, default=port)
     group1.add_argument("-i", "--ip", help="define ip to use, default ip='127.0.0.1'", type=str, default=ip)
     group1.add_argument("-r", "--repeat", help="Repeat execution 'Hello World' times. Default repeat=2", type=int, default=repeat)
-    group1.add_argument("FILE", help="FILE to send, defaul=file.txt ", type=str)
+    group1.add_argument("FILE", help="FILE to send, default=file.txt ", type=str)
     args = parser.parse_args()
 
     if args.port:
