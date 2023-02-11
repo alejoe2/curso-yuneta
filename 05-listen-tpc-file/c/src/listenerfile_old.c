@@ -274,7 +274,7 @@ int process_data(client_t *client, char *bf, size_t bflen)
                 gbuf2file(client->gbuf_content, client->filename, 777, true);
                 client->fp = -1;
 
-                GBUF_DECREF(client->gbuf_content)
+                //GBUF_DECREF(client->gbuf_content) TODO: Consultar si gbuf2file hace el DECREF o hay que hacerlo aparte
                 GBUF_DECREF(client->gbuf_filename)
                 gbuf_clear(client->gbuf_header);
 
