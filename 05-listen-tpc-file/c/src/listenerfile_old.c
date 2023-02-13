@@ -165,7 +165,7 @@ int new_client(uv_tcp_t *uv_tcp)
     uv_tcp->data = client;
     client->uv = uv_tcp;
 
-    client->gbuf_header = gbuf_create(8, 8, 0, 0);
+    client->gbuf_header = gbuf_create(sizeof(header_t), sizeof(header_t), 0, 0);
     if(!client->gbuf_header) {
         // log_error TODO desconectar
         return -1;
@@ -206,83 +206,114 @@ void free_client(client_t *client)
  *******************************************************************/
 int process_data(client_t *client, char *bf, size_t bflen)
 {
+    trace_msg0("ENTRO st %d, recibo %d bytes", client->state, (int)bflen);
+
     while(bflen > 0) {
         switch(client->state) {
-        case ST_WAIT_HEADER: {
-            size_t written = gbuf_append(client->gbuf_header, bf, bflen);
-            bflen -= written;
-            bf += written;
+        case ST_WAIT_HEADER:
+            {
+                size_t written = gbuf_append(
+                    client->gbuf_header,
+                    bf,
+                    MIN(gbuf_freebytes(client->gbuf_header), bflen)
+                );
+                bflen -= written;
+                bf += written;
+                trace_msg0("st %d, consumo %d, quedan %d", client->state, (int)written, (int)bflen);
 
-            if(gbuf_totalbytes(client->gbuf_header) == sizeof(header_t)) {
-
-                memmove(
+                if(gbuf_totalbytes(client->gbuf_header) == sizeof(header_t)) {
+                    memmove(
                         &client->header.filename_length,
                         gbuf_get(client->gbuf_header, sizeof(uint32_t)),
-                        sizeof(uint32_t));
-                client->header.filename_length = htonl(client->header.filename_length);
+                        sizeof(uint32_t)
+                    );
+                    client->header.filename_length = htonl(client->header.filename_length);
 
-                memmove(
-                    &client->header.file_length,
-                    gbuf_get(client->gbuf_header, sizeof(uint32_t)),
-                    sizeof(uint32_t));
-                client->header.file_length = htonl(client->header.file_length);
+                    memmove(
+                        &client->header.file_length,
+                        gbuf_get(client->gbuf_header, sizeof(uint32_t)),
+                        sizeof(uint32_t)
+                    );
+                    client->header.file_length = htonl(client->header.file_length);
 
-                client->gbuf_filename = gbuf_create(
-                    client->header.filename_length,
-                    client->header.filename_length,
-                    0,
-                    0);
-                if(!client->gbuf_filename) {
-                    // TODO log_error
-                    return -1;
+                    client->gbuf_filename = gbuf_create(
+                        client->header.filename_length,
+                        client->header.filename_length,
+                        0,
+                        0);
+                    if(!client->gbuf_filename) {
+                        trace_msg0("No memory for gbuf_filename");
+                        return -1;
+                    }
+
+                    client->gbuf_content = gbuf_create(
+                        client->header.file_length,
+                        client->header.file_length,
+                        0,
+                        0
+                    );
+                    if(!client->gbuf_content) {
+                        trace_msg0("No memory for gbuf_content");
+                        return -1;
+                    }
+                    trace_msg0("Next state: ST_WAIT_FILENAME");
+                    client->state = ST_WAIT_FILENAME;
                 }
+            }
+            break;
 
-                client->gbuf_content = gbuf_create(2 * 1024, 0, client->header.file_length, 0);
-                if(!client->gbuf_content) {
-                    // TODO log_error
-                    return -1;
+        case ST_WAIT_FILENAME:
+            {
+                size_t written = gbuf_append(
+                    client->gbuf_filename,
+                    bf,
+                    MIN(gbuf_freebytes(client->gbuf_filename), bflen)
+                );
+                bflen -= written;
+                bf += written;
+                trace_msg0("st %d, consumo %d, quedan %d", client->state, (int)written, (int)bflen);
+
+                if(gbuf_totalbytes(client->gbuf_filename) == client->header.filename_length) {
+                    memmove(
+                        client->filename,
+                        gbuf_get(client->gbuf_filename, client->header.filename_length),
+                        client->header.filename_length);
+
+                    trace_msg0("Next state: ST_WAIT_CONTENT");
+                    client->state = ST_WAIT_CONTENT;
+                    printf("FILENAME: %s\n", client->filename);
                 }
-
-                client->state = ST_WAIT_FILENAME;
             }
-        } break;
+            break;
 
-        case ST_WAIT_FILENAME: {
-            size_t written = gbuf_append(client->gbuf_filename, bf, bflen);
-            bflen -= written;
-            bf += written;
+        case ST_WAIT_CONTENT:
+            {
+                size_t written = gbuf_append(
+                    client->gbuf_content,
+                    bf,
+                    MIN(gbuf_freebytes(client->gbuf_content), bflen)
+                );
+                bflen -= written;
+                bf += written;
+                trace_msg0("st %d, consumo %d, quedan %d", client->state, (int)written, (int)bflen);
 
-            if(gbuf_totalbytes(client->gbuf_filename) == client->header.filename_length) {
+                if(gbuf_totalbytes(client->gbuf_content) == client->header.file_length) {
+                    gbuf2file(client->gbuf_content, client->filename, 777, true);
+                    client->fp = -1;
 
-                memmove(
-                    client->filename,
-                    gbuf_get(client->gbuf_filename, client->header.filename_length),
-                    client->header.filename_length);
+                    //GBUF_DECREF(client->gbuf_content) TODO: Consultar si gbuf2file hace el DECREF o hay que hacerlo aparte
+                    GBUF_DECREF(client->gbuf_filename)
+                    gbuf_clear(client->gbuf_header);
 
-                client->state = ST_WAIT_CONTENT;
-                printf("FILENAME: %s\n", client->filename);
+                    trace_msg0("Next state: ST_WAIT_HEADER");
+                    client->state = ST_WAIT_HEADER;
+                }
             }
-        } break;
-
-        case ST_WAIT_CONTENT: {
-            size_t written = gbuf_append(client->gbuf_content, bf, bflen);
-            bflen -= written;
-            bf += written;
-
-            if(gbuf_totalbytes(client->gbuf_content) == client->header.file_length) {
-
-                gbuf2file(client->gbuf_content, client->filename, 777, true);
-                client->fp = -1;
-
-                //GBUF_DECREF(client->gbuf_content) TODO: Consultar si gbuf2file hace el DECREF o hay que hacerlo aparte
-                GBUF_DECREF(client->gbuf_filename)
-                gbuf_clear(client->gbuf_header);
-
-                client->state = ST_WAIT_HEADER;
-            }
-        } break;
+            break;
         }
     }
+
+    trace_msg0("SALGO st %d, recibo %d bytes\n", client->state, (int)bflen);
 
     return 0;
 }
@@ -394,6 +425,26 @@ int main(int argc, char *argv[])
 
     init_ghelpers_library(programfile);
 
+#define MEM_MAX_BLOCK           209715200   // 200*M
+#define MEM_MAX_SYSTEM_MEMORY   4294967296  // 4*G
+
+    gbmem_startup_system(
+        MEM_MAX_BLOCK,
+        MEM_MAX_SYSTEM_MEMORY
+    );
+
+    json_set_alloc_funcs(
+        gbmem_malloc,
+        gbmem_free
+    );
+
+    log_startup(
+        programfile,             // application name
+        "1.9.9",            // applicacion version
+        programfile     // executable program, to can trace stack
+    );
+    log_add_handler(programfile, "stdout", LOG_OPT_LOGGER, 0);
+
     /*Default values*/
     memset(&arguments, 0, sizeof(arguments));
     arguments.port = 7000;
@@ -418,6 +469,8 @@ int main(int argc, char *argv[])
 
     uv_run(loop, UV_RUN_DEFAULT);
 
+    gbmem_log_info(true);
     end_ghelpers_library();
+
     return 0;
 }
