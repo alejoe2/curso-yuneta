@@ -39,10 +39,12 @@ SET (YUNO_SRCS
     src/main.c
     src/yuno_receive_file.c
     src/c_receive_file.c
+    src/c_decoder_receive_file.c
 )
 SET (YUNO_HDRS
     src/yuno_receive_file.h
     src/c_receive_file.h
+    src/c_decoder_receive_file.h
 )
 
 ##############################################

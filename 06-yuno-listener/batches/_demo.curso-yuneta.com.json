@@ -1,0 +1,9 @@
+{"command": "check-realm id=demo.curso-yuneta.com"}
+
+{"xcommand": "-create-realm id=demo.curso-yuneta.com realm_owner=curso realm_role=curso-yuneta realm_name=demo realm_env=com"}
+
+{"command": "-install-binary id=receive_file     content64=$$(receive_file)"}
+
+{"command": "-create-config id=receive_file.7000     content64=$$(./receive_file.7000.json)"}
+
+{"command": "-create-yuno id=7000   yuno_role=receive_file   yuno_name=7000  must_play=1 yuno_tag=gate realm_id=demo.curso-yuneta.com"}

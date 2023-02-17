@@ -1,0 +1,55 @@
+{
+    "__version__": "1",
+    "__description__": "initial load",
+    "global": {
+        "__input_side__.__json_config_variables__": {
+            "__input_url__": "tcp://127.0.0.0:7000"
+        }
+    },
+    "services": [
+        {
+            "name": "__input_side__",
+            "gclass": "IOGate",
+            "autostart": false,
+            "autoplay": false,
+            "zchilds": [
+                {
+                    "name": "server_port",
+                    "as_unique": true,
+                    "gclass": "TcpS0",
+                    "kw": {
+                        "url": "(^^__input_url__^^)",
+                        "child_tree_filter": {
+                            "op": "find",
+                            "kw": {
+                                "__prefix_gobj_name__": "input-",
+                                "__gclass_name__": "Channel",
+                                "__disabled__": false,
+                                "connected": false
+                            }
+                        }
+                    }
+                }
+            ],
+            "[^^zchilds^^]": {
+                "__range__": [[1,999]],
+                "__vars__": {
+                },
+                "__content__": {
+                    "name": "input-(^^__range__^^)",
+                    "gclass": "Channel",
+                    "kw": {
+                    },
+                    "zchilds": [
+                        {
+                            "name": "input-(^^__range__^^)",
+                            "gclass": "Decoder_receive_file",
+                            "kw": {
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}

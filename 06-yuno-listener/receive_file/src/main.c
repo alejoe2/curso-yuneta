@@ -9,6 +9,7 @@
  ****************************************************************************/
 #include <yuneta.h>
 #include "c_receive_file.h"
+#include "c_decoder_receive_file.h"
 #include "yuno_receive_file.h"
 
 /***************************************************************************
@@ -37,10 +38,10 @@ PRIVATE char variable_config[]= "\
     'environment': {                                                \n\
         'use_system_memory': true,                                  \n\
         'log_gbmem_info': true,                                     \n\
-        'MEM_MIN_BLOCK': 32,                                        \n\
-        'MEM_MAX_BLOCK': 65536,             #^^ 64*K                \n\
-        'MEM_SUPERBLOCK': 131072,           #^^ 128*K               \n\
-        'MEM_MAX_SYSTEM_MEMORY': 1048576,   #^^ 1*M                 \n\
+        'MEM_MIN_BLOCK': 512,                                       \n\
+        'MEM_MAX_BLOCK': 209715200,             #^^  200*M          \n\
+        'MEM_SUPERBLOCK': 209715200,            #^^  200*M          \n\
+        'MEM_MAX_SYSTEM_MEMORY': 2147483648,    #^^ 2*G             \n\
         'console_log_handlers': {                                   \n\
             'to_stdout': {                                          \n\
                 'handler_type': 'stdout',                           \n\
@@ -101,6 +102,7 @@ static void register_yuno_and_more(void)
     /*--------------------*
      *  Register service
      *--------------------*/
+    gobj_register_gclass(GCLASS_DECODER_RECEIVE_FILE);
     gobj_register_gclass(GCLASS_RECEIVE_FILE);
 }
 

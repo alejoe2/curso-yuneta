@@ -96,6 +96,8 @@ SDATA_END()
  *              Private data
  *---------------------------------------------*/
 typedef struct _PRIVATE_DATA {
+    hgobj gobj_input_side;
+
     int32_t timeout;
     hgobj timer;
 } PRIVATE_DATA;
@@ -177,7 +179,12 @@ PRIVATE int mt_play(hgobj gobj)
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
 
-    set_timeout_periodic(priv->timer, priv->timeout);
+//    set_timeout_periodic(priv->timer, priv->timeout);
+
+    priv->gobj_input_side = gobj_find_service("__input_side__", TRUE);
+    gobj_subscribe_event(priv->gobj_input_side, NULL, 0, gobj);
+    gobj_start_tree(priv->gobj_input_side);
+
     return 0;
 }
 
@@ -187,6 +194,9 @@ PRIVATE int mt_play(hgobj gobj)
 PRIVATE int mt_pause(hgobj gobj)
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
+
+    gobj_stop_tree(priv->gobj_input_side);
+    gobj_unsubscribe_event(priv->gobj_input_side, NULL, 0, gobj);
 
     clear_timeout(priv->timer);
     return 0;
@@ -207,7 +217,7 @@ PRIVATE int mt_pause(hgobj gobj)
  ***************************************************************************/
 PRIVATE json_t *cmd_help(hgobj gobj, const char *cmd, json_t *kw, hgobj src)
 {
-    KW_INCREF(kw);
+    KW_INCREF(kw)
     json_t *jn_resp = gobj_build_cmds_doc(gobj, kw);
     return msg_iev_build_webix(
         gobj,
@@ -247,10 +257,14 @@ PRIVATE json_t *cmd_authzs(hgobj gobj, const char *cmd, json_t *kw, hgobj src)
 /***************************************************************************
  *
  ***************************************************************************/
-PRIVATE int ac_sample(hgobj gobj, const char *event, json_t *kw, hgobj src)
+PRIVATE int ac_on_file(hgobj gobj, const char *event, json_t *kw, hgobj src)
 {
+    PRIVATE_DATA *priv = gobj_priv_data(gobj);
+    GBUFFER *gbuf = (GBUFFER *)(size_t)kw_get_int(kw, "gbuffer", 0, 0);
 
-    KW_DECREF(kw);
+//    PUBLIC const char *gbuf_getlabel(GBUFFER *gbuf);
+
+    KW_DECREF(kw)
     return 0;
 }
 
@@ -259,13 +273,12 @@ PRIVATE int ac_sample(hgobj gobj, const char *event, json_t *kw, hgobj src)
  ***************************************************************************/
 PRIVATE int ac_timeout(hgobj gobj, const char *event, json_t *kw, hgobj src)
 {
-    printf("Timeout\n");
 
 //     if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
 //         log_debug_printf("", "sample");
 //     }
 
-    KW_DECREF(kw);
+    KW_DECREF(kw)
     return 0;
 }
 
@@ -274,7 +287,7 @@ PRIVATE int ac_timeout(hgobj gobj, const char *event, json_t *kw, hgobj src)
  ***************************************************************************/
 PRIVATE const EVENT input_events[] = {
     // top input
-    {"EV_SAMPLE",       0,  0,  "Description of resource"},
+    {"EV_ON_FILE",      0,  0,  ""},
     // bottom input
     {"EV_TIMEOUT",      0,  0,  ""},
     {"EV_STOPPED",      0,  0,  ""},
@@ -290,7 +303,7 @@ PRIVATE const char *state_names[] = {
 };
 
 PRIVATE EV_ACTION ST_IDLE[] = {
-    {"EV_SAMPLE",               ac_sample,              0},
+    {"EV_ON_FILE",              ac_on_file,             0},
     {"EV_TIMEOUT",              ac_timeout,             0},
     {"EV_STOPPED",              0,                      0},
     {0,0,0}
