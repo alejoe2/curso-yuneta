@@ -62,6 +62,22 @@ PRIVATE const trace_level_t s_user_trace_level[16] = {
 /*---------------------------------------------*
  *              Private data
  *---------------------------------------------*/
+
+
+typedef enum
+{
+    ST_WAIT_HEADER,
+    ST_WAIT_FILENAME,
+    ST_WAIT_CONTENT
+} state_t;
+
+#pragma pack(1)
+typedef struct header_s {
+    uint32_t filename_length;
+    uint32_t file_length;
+} header_t;
+#pragma pack()
+
 typedef struct _PRIVATE_DATA {
     hgobj timer;
     char iamServer;                     // What side? server or client
@@ -72,7 +88,19 @@ typedef struct _PRIVATE_DATA {
     const char *on_close_event_name;
     const char *on_message_event_name;
     int inform_on_close;
+
+    header_t header;
+    char filename[256];
+    GBUFFER *gbuf_header;
+    GBUFFER *gbuf_filename;
+    GBUFFER *gbuf_content;
+    state_t state;
+
 } PRIVATE_DATA;
+
+
+
+
 
 
 
@@ -171,7 +199,136 @@ PRIVATE void mt_destroy(hgobj gobj)
              *      Local Methods
              ***************************/
 
+/*******************************************************************
+ *  On Process Data
+ *******************************************************************/
+int process_data(hgobj gobj, GBUFFER *gbuf)
+{
+    size_t gbflen = gbuf_totalbytes(gbuf);
+    PRIVATE_DATA *priv = gobj_priv_data(gobj);
+    log_debug_gbuf(LOG_DUMP_INPUT, gbuf, "%s", gobj_short_name(gobj));
+    //trace_msg0("ENTRO st %d, recibo %d bytes", priv->state, (int)gbflen);
 
+    while(gbflen > 0) {
+        switch(priv->state) {
+            case ST_WAIT_HEADER:
+            {
+                size_t written = gbuf_append(
+                        priv->gbuf_header,
+                        gbuf_get(gbuf, sizeof(gbflen)),
+                        MIN(gbuf_freebytes(priv->gbuf_header), gbflen)
+                );
+                gbflen -= written;
+                //gbuf += written;
+                //trace_msg0("st %d, consumo %d, quedan %d", priv->state, (int)written, (int)gbflen);
+
+                if(gbuf_totalbytes(priv->gbuf_header) == sizeof(header_t)) {
+
+                    memmove(
+                        &priv->header.filename_length,
+                        gbuf_get(priv->gbuf_header, sizeof(uint32_t)),
+                        sizeof(uint32_t)
+                    );
+                    priv->header.filename_length = htonl(priv->header.filename_length);
+
+                    memmove(
+                        &priv->header.file_length,
+                        gbuf_get(priv->gbuf_header, sizeof(uint32_t)),
+                        sizeof(uint32_t)
+                    );
+
+                    priv->header.file_length = htonl(priv->header.file_length);
+
+                    priv->gbuf_filename = gbuf_create(
+                        priv->header.filename_length,
+                        priv->header.filename_length,
+                        0,
+                        0
+                    );
+
+                    if(!priv->gbuf_filename) {
+                        trace_msg0("No memory for gbuf_filename");
+                        return -1;
+                    }
+
+                    priv->gbuf_content = gbuf_create(
+                        priv->header.file_length,
+                        priv->header.file_length,
+                        0,
+                        0
+                    );
+                    if(!priv->gbuf_content) {
+                        trace_msg0("No memory for gbuf_content");
+                        return -1;
+                    }
+                    //trace_msg0("Next state: ST_WAIT_FILENAME");
+                    priv->state = ST_WAIT_FILENAME;
+                }
+            }
+                break;
+
+            case ST_WAIT_FILENAME:
+            {
+                size_t written = gbuf_append(
+                    priv->gbuf_filename,
+                    gbuf_get(gbuf, sizeof(gbflen)),
+                    MIN(gbuf_freebytes(priv->gbuf_filename), gbflen)
+                );
+                gbflen -= written;
+                //gbuf += written;
+                //trace_msg0("st %d, consumo %d, quedan %d", priv->state, (int)written, (int)gbflen);
+
+                if(gbuf_totalbytes(priv->gbuf_filename) == priv->header.filename_length) {
+                    memmove(
+                        priv->filename,
+                        gbuf_get(priv->gbuf_filename, priv->header.filename_length),
+                        priv->header.filename_length
+                    );
+
+                    //trace_msg0("Next state: ST_WAIT_CONTENT");
+                    priv->state = ST_WAIT_CONTENT;
+                }
+            }
+                break;
+
+            case ST_WAIT_CONTENT:
+            {
+                size_t written = gbuf_append(
+                    priv->gbuf_content,
+                    gbuf_get(gbuf, sizeof(gbflen)),
+                    MIN(gbuf_freebytes(priv->gbuf_content), gbflen)
+                );
+                gbflen -= written;
+                //gbuf += written;
+                //trace_msg0("st %d, consumo %d, quedan %d", priv->state, (int)written, (int)gbflen);
+
+                if(gbuf_totalbytes(priv->gbuf_content) == priv->header.file_length) {
+
+                    printf("FILENAME: %s\n", priv->filename);
+
+                    gbuf_setlabel(priv->gbuf_content, priv->filename);
+
+                    json_t *kw_publish = json_pack("{s:I}",
+                        "gbuffer", (json_int_t)(size_t)priv->gbuf_content
+                    );
+
+                    gobj_publish_event(gobj, "EV_ON_FILE", kw_publish);
+
+                    GBUF_DECREF(priv->gbuf_filename)
+                    gbuf_clear(priv->gbuf_header);
+
+                    //trace_msg0("Next state: ST_WAIT_HEADER");
+                    priv->state = ST_WAIT_HEADER;
+                }
+            }
+                break;
+        }
+    }
+
+    trace_msg0("SALGO st %d, recibo %d bytes\n", priv->state, (int)gbflen);
+
+    return 0;
+}
 
 
             /***************************
@@ -199,6 +356,12 @@ PRIVATE int ac_connected(hgobj gobj, const char *event, json_t *kw, hgobj src)
 
     set_timeout(priv->timer, priv->timeout_inactivity);
 
+    priv->gbuf_header = gbuf_create(sizeof(header_t), sizeof(header_t), 0, 0);
+    if(!priv->gbuf_header) {
+        trace_msg0("Disconnected !priv->gbuf_header");
+        return -1;
+    }
+
     KW_DECREF(kw);
     return 0;
 }
@@ -225,6 +388,16 @@ PRIVATE int ac_disconnected(hgobj gobj, const char *event, json_t *kw, hgobj src
         }
     }
 
+    if(priv->gbuf_header) {
+        GBUF_DECREF(priv->gbuf_header)
+    }
+    if(priv->gbuf_content) {
+        //GBUF_DECREF(priv->gbuf_content)
+    }
+    if(priv->gbuf_filename) {
+        GBUF_DECREF(priv->gbuf_filename)
+    }
+
     KW_DECREF(kw);
     return 0;
 }
@@ -243,26 +416,7 @@ PRIVATE int ac_rx_data(hgobj gobj, const char *event, json_t *kw, hgobj src)
         log_debug_gbuf(LOG_DUMP_INPUT, gbuf, "%s", gobj_short_name(gobj));
     }
 
-    // TODO parse input message or directly publish
-    if (priv->iamServer) {
-        /*
-         *  Server
-         *  Analyze the request
-         */
-    } else {
-        /*
-         *  Client
-         *  Analyze the response
-         */
-    }
-
-//    json_t *kw_publish = json_pack("{s:I}",
-//        "gbuffer", (json_int_t)(size_t)gbuf
-//    );
-//    gobj_publish_event(gobj, "EV_ON_FILE", kw_publish);
-    //gbuf_setlabel(GBUFFER *gbuf, const char *label);
-//    process_data(gobj, gbuffer);
-
+    process_data(gobj, gbuf);
 
     KW_DECREF(kw);
     return 0;
@@ -332,6 +486,7 @@ PRIVATE const EVENT output_events[] = {
     {"EV_ON_OPEN",          0,  0,  ""},
     {"EV_ON_CLOSE",         0,  0,  ""},
     {"EV_ON_MESSAGE",       0,  0,  ""},
+    {"EV_ON_FILE",          0,   0,  0},
     {NULL, 0, 0, ""}
 };
 PRIVATE const char *state_names[] = {

@@ -56,10 +56,10 @@ SDATA_END()
  *      Attributes - order affect to oid's
  *---------------------------------------------*/
 PRIVATE sdata_desc_t tattr_desc[] = {
-/*-ATTR-type------------name----------------flag------------------------default---------description---------- */
-SDATA (ASN_INTEGER,     "timeout",          SDF_RD,                     1*1000,         "Timeout"),
-SDATA (ASN_POINTER,     "user_data",        0,                          0,              "user data"),
-SDATA (ASN_POINTER,     "user_data2",       0,                          0,              "more user data"),
+/*-ATTR-type------------name-------------------------flag------------------default---------description---------- */
+SDATA (ASN_INTEGER,     "timeout",              SDF_RD,                1*1000,         "Timeout"),
+SDATA (ASN_POINTER,     "user_data",            0,                     0,              "user data"),
+SDATA (ASN_POINTER,     "user_data2",           0,                     0,              "more user data"),
 SDATA_END()
 };
 
@@ -135,7 +135,7 @@ PRIVATE void mt_writing(hgobj gobj, const char *path)
 {
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
 
-    IF_EQ_SET_PRIV(timeout,             gobj_read_int32_attr)
+    IF_EQ_SET_PRIV(timeout,                 gobj_read_int32_attr)
     END_EQ_SET_PRIV()
 }
 
@@ -259,14 +259,38 @@ PRIVATE json_t *cmd_authzs(hgobj gobj, const char *cmd, json_t *kw, hgobj src)
  ***************************************************************************/
 PRIVATE int ac_on_file(hgobj gobj, const char *event, json_t *kw, hgobj src)
 {
-    PRIVATE_DATA *priv = gobj_priv_data(gobj);
-    GBUFFER *gbuf = (GBUFFER *)(size_t)kw_get_int(kw, "gbuffer", 0, 0);
 
-//    PUBLIC const char *gbuf_getlabel(GBUFFER *gbuf);
+    printf(" **** ac_on_file ***:\n");
+
+    //PRIVATE_DATA *priv = gobj_priv_data(gobj);
+    //GBUFFER *gbuf = (GBUFFER *)(size_t)kw_get_int(kw, "gbuffer", 0, 0);
+
+    //PUBLIC const char *gbuf_getlabel(GBUFFER *gbuf);
 
     KW_DECREF(kw)
     return 0;
 }
+
+/***************************************************************************
+ *  connected
+ ***************************************************************************/
+PRIVATE int ac_on_open(hgobj gobj, const char *event, json_t *kw, hgobj src)
+{
+
+    KW_DECREF(kw);
+    return 0;
+}
+
+/***************************************************************************
+ *  disconnected
+ ***************************************************************************/
+PRIVATE int ac_on_close(hgobj gobj, const char *event, json_t *kw, hgobj src)
+{
+
+    KW_DECREF(kw);
+    return 0;
+}
+
 
 /***************************************************************************
  *
@@ -289,6 +313,8 @@ PRIVATE const EVENT input_events[] = {
     // top input
     {"EV_ON_FILE",      0,  0,  ""},
     // bottom input
+    {"EV_ON_OPEN",      0,  0,  ""},
+    {"EV_ON_CLOSE",     0,  0,  ""},
     {"EV_TIMEOUT",      0,  0,  ""},
     {"EV_STOPPED",      0,  0,  ""},
     // internal
@@ -305,6 +331,8 @@ PRIVATE const char *state_names[] = {
 PRIVATE EV_ACTION ST_IDLE[] = {
     {"EV_ON_FILE",              ac_on_file,             0},
     {"EV_TIMEOUT",              ac_timeout,             0},
+    {"EV_ON_OPEN",              ac_on_open,             0},
+    {"EV_ON_CLOSE",             ac_on_close,            0},
     {"EV_STOPPED",              0,                      0},
     {0,0,0}
 };
