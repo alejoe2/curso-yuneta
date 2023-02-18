@@ -57,11 +57,10 @@ def connectport(port, ip, FILE, repeat):
 
     for i in range(1, repeat+1):
 
-        print("Send file:", FILE)
-
         # Envía longitud nombre fichero
         file_name_len = len(FILE)
         to_send = file_name_len.to_bytes(4, byteorder='big')
+        print("file_name_len:", file_name_len)
         client_socket.sendall(to_send)
 
         # Envía longitud fichero
@@ -72,6 +71,7 @@ def connectport(port, ip, FILE, repeat):
 
         # Envía nombre fichero
         client_socket.sendall(FILE.encode())
+        print("Send file:", FILE)
 
         # Envía fichero
         with open(FILE, 'rb') as f:

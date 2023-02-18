@@ -216,7 +216,7 @@ int process_data(hgobj gobj, GBUFFER *gbuf)
             {
                 size_t written = gbuf_append(
                         priv->gbuf_header,
-                        gbuf_get(gbuf, sizeof(gbflen)),
+                        gbuf_get(gbuf, sizeof(header_t)),
                         MIN(gbuf_freebytes(priv->gbuf_header), gbflen)
                 );
                 gbflen -= written;
@@ -237,7 +237,6 @@ int process_data(hgobj gobj, GBUFFER *gbuf)
                         gbuf_get(priv->gbuf_header, sizeof(uint32_t)),
                         sizeof(uint32_t)
                     );
-
                     priv->header.file_length = htonl(priv->header.file_length);
 
                     priv->gbuf_filename = gbuf_create(
@@ -274,7 +273,7 @@ int process_data(hgobj gobj, GBUFFER *gbuf)
             {
                 size_t written = gbuf_append(
                     priv->gbuf_filename,
-                    gbuf_get(gbuf, sizeof(gbflen)),
+                    gbuf_get(gbuf, priv->header.filename_length),
                     MIN(gbuf_freebytes(priv->gbuf_filename), gbflen)
                 );
                 gbflen -= written;
@@ -302,35 +301,37 @@ int process_data(hgobj gobj, GBUFFER *gbuf)
             {
                 size_t written = gbuf_append(
                     priv->gbuf_content,
-                    gbuf_get(gbuf, sizeof(gbflen)),
+                    gbuf_get(gbuf, MIN(gbuf_freebytes(priv->gbuf_content), gbflen)),
                     MIN(gbuf_freebytes(priv->gbuf_content), gbflen)
                 );
                 gbflen -= written;
                 //gbuf += written;
+
                 if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
                     trace_msg0("st %d, consumo %d, quedan %d", priv->state, (int) written, (int) gbflen);
                 }
 
                 if(gbuf_totalbytes(priv->gbuf_content) == priv->header.file_length) {
 
-                    printf("FILENAME: %s\n", priv->filename);
 
                     gbuf_setlabel(priv->gbuf_content, priv->filename);
-
+                    GBUF_INCREF(priv->gbuf_content);
                     json_t *kw_publish = json_pack("{s:s, s:s, s:I}",
                         "type", "file",
                         "filename", priv->filename,
                         "gbuffer", (json_int_t)(size_t)priv->gbuf_content
                     );
-                    priv->gbuf_content = 0;
                     gobj_publish_event(gobj, "EV_ON_MESSAGE", kw_publish);
 
+                    priv->gbuf_content = 0;
+                    memset(priv->filename, 0, sizeof(priv->filename));
                     GBUF_DECREF(priv->gbuf_filename)
                     gbuf_clear(priv->gbuf_header);
 
                     if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
                         trace_msg0("Next state: ST_WAIT_HEADER");
                     }
+
                     priv->state = ST_WAIT_HEADER;
                 }
             }

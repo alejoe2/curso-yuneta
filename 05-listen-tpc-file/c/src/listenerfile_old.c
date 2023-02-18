@@ -44,7 +44,6 @@ typedef struct client_s
     GBUFFER *gbuf_content;
 
     uv_tcp_t *uv;
-    int fp;
     state_t state;
 } client_t;
 
@@ -184,10 +183,6 @@ void free_client(client_t *client)
 {
     // TODO revisar cuando hay que liberar free(buf->base);
 
-    if(client->fp) {
-        close(client->fp);
-        client->fp = 0;
-    }
     if(client->gbuf_header) {
         GBUF_DECREF(client->gbuf_header)
     }
@@ -299,7 +294,6 @@ int process_data(client_t *client, char *bf, size_t bflen)
 
                 if(gbuf_totalbytes(client->gbuf_content) == client->header.file_length) {
                     gbuf2file(client->gbuf_content, client->filename, 777, true);
-                    client->fp = -1;
 
                     //GBUF_DECREF(client->gbuf_content) TODO: Consultar si gbuf2file hace el DECREF o hay que hacerlo aparte
                     GBUF_DECREF(client->gbuf_filename)

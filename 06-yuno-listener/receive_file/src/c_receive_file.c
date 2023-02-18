@@ -57,7 +57,7 @@ SDATA_END()
  *---------------------------------------------*/
 PRIVATE sdata_desc_t tattr_desc[] = {
 /*-ATTR-type------------name-------------------------flag------------------default---------description---------- */
-SDATA (ASN_OCTET_STR,   "path",                 SDF_WR|SDF_PERSIST,    "~/",         "Path donde guardar los ficheros"),
+SDATA (ASN_OCTET_STR,   "path",                 SDF_WR|SDF_PERSIST,    "/yuneta/development/projects/curso-yuneta/luis-echeverria/06-yuno-listener/receive_file/build/files",         "Path donde guardar los ficheros"),
 SDATA (ASN_INTEGER,     "timeout",              SDF_RD,                1*1000,         "Timeout"),
 SDATA (ASN_POINTER,     "user_data",            0,                     0,              "user data"),
 SDATA (ASN_POINTER,     "user_data2",           0,                     0,              "more user data"),
@@ -263,13 +263,22 @@ PRIVATE json_t *cmd_authzs(hgobj gobj, const char *cmd, json_t *kw, hgobj src)
  ***************************************************************************/
 PRIVATE int ac_on_file(hgobj gobj, const char *event, json_t *kw, hgobj src)
 {
+    PRIVATE_DATA *priv = gobj_priv_data(gobj);
+    GBUFFER *gbuf = (GBUFFER *)(size_t)kw_get_int(kw, "gbuffer", 0, 0);
+    const char *filename = kw_get_str(kw, "filename", 0, 0);
 
-    printf(" **** ac_on_file ***:\n");
+    if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
+        trace_msg0("Recive: %s\n", filename);
+    }
 
-    //PRIVATE_DATA *priv = gobj_priv_data(gobj);
-    //GBUFFER *gbuf = (GBUFFER *)(size_t)kw_get_int(kw, "gbuffer", 0, 0);
 
-    //PUBLIC const char *gbuf_getlabel(GBUFFER *gbuf);
+    char pathbf[256];
+    if(!subdir_exists(priv->path, 0)){
+        mkdir(priv->path, 0777);
+    };
+
+    build_path2(pathbf, sizeof(pathbf), priv->path, filename);
+    gbuf2file(gbuf, pathbf, 0777, true);
 
     KW_DECREF(kw)
     return 0;
