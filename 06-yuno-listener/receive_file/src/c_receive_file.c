@@ -57,6 +57,7 @@ SDATA_END()
  *---------------------------------------------*/
 PRIVATE sdata_desc_t tattr_desc[] = {
 /*-ATTR-type------------name-------------------------flag------------------default---------description---------- */
+SDATA (ASN_OCTET_STR,   "path",                 SDF_WR|SDF_PERSIST,    "~/",         "Path donde guardar los ficheros"),
 SDATA (ASN_INTEGER,     "timeout",              SDF_RD,                1*1000,         "Timeout"),
 SDATA (ASN_POINTER,     "user_data",            0,                     0,              "user data"),
 SDATA (ASN_POINTER,     "user_data2",           0,                     0,              "more user data"),
@@ -97,7 +98,7 @@ SDATA_END()
  *---------------------------------------------*/
 typedef struct _PRIVATE_DATA {
     hgobj gobj_input_side;
-
+    const char *path;
     int32_t timeout;
     hgobj timer;
 } PRIVATE_DATA;
@@ -126,6 +127,7 @@ PRIVATE void mt_create(hgobj gobj)
      *  HACK The writable attributes must be repeated in mt_writing method.
      */
     SET_PRIV(timeout,               gobj_read_int32_attr)
+    SET_PRIV(path,                  gobj_read_str_attr)
 }
 
 /***************************************************************************
@@ -136,6 +138,8 @@ PRIVATE void mt_writing(hgobj gobj, const char *path)
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
 
     IF_EQ_SET_PRIV(timeout,                 gobj_read_int32_attr)
+    ELIF_EQ_SET_PRIV(path,                  gobj_read_str_attr)
+        gobj_save_persistent_attrs(gobj, 0);
     END_EQ_SET_PRIV()
 }
 
