@@ -52,9 +52,11 @@ SDATA_END()
  *  in s_user_trace_level
  *---------------------------------------------*/
 enum {
-    TRACE_MESSAGES = 0x0001,
+    TRACE_TRAFFIC  = 0x0001,
+    TRACE_MESSAGES = 0x0002,
 };
 PRIVATE const trace_level_t s_user_trace_level[16] = {
+{"traffic",         "Trace traffic"},
 {"messages",        "Trace messages"},
 {0, 0},
 };
@@ -62,8 +64,6 @@ PRIVATE const trace_level_t s_user_trace_level[16] = {
 /*---------------------------------------------*
  *              Private data
  *---------------------------------------------*/
-
-
 typedef enum
 {
     ST_WAIT_HEADER,
@@ -97,10 +97,6 @@ typedef struct _PRIVATE_DATA {
     state_t state;
 
 } PRIVATE_DATA;
-
-
-
-
 
 
 
@@ -199,6 +195,9 @@ PRIVATE void mt_destroy(hgobj gobj)
              *      Local Methods
              ***************************/
 
+
+
+
 /*******************************************************************
  *  On Process Data
  *******************************************************************/
@@ -206,8 +205,10 @@ int process_data(hgobj gobj, GBUFFER *gbuf)
 {
     size_t gbflen = gbuf_totalbytes(gbuf);
     PRIVATE_DATA *priv = gobj_priv_data(gobj);
-    log_debug_gbuf(LOG_DUMP_INPUT, gbuf, "%s", gobj_short_name(gobj));
-    //trace_msg0("ENTRO st %d, recibo %d bytes", priv->state, (int)gbflen);
+
+    if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
+        trace_msg0("ENTRO st %d, recibo %d bytes", priv->state, (int)gbflen);
+    }
 
     while(gbflen > 0) {
         switch(priv->state) {
@@ -261,7 +262,9 @@ int process_data(hgobj gobj, GBUFFER *gbuf)
                         trace_msg0("No memory for gbuf_content");
                         return -1;
                     }
-                    //trace_msg0("Next state: ST_WAIT_FILENAME");
+                    if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
+                        trace_msg0("Next state: ST_WAIT_FILENAME");
+                    }
                     priv->state = ST_WAIT_FILENAME;
                 }
             }
@@ -276,7 +279,9 @@ int process_data(hgobj gobj, GBUFFER *gbuf)
                 );
                 gbflen -= written;
                 //gbuf += written;
-                //trace_msg0("st %d, consumo %d, quedan %d", priv->state, (int)written, (int)gbflen);
+                if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
+                    trace_msg0("st %d, consumo %d, quedan %d", priv->state, (int)written, (int)gbflen);
+                }
 
                 if(gbuf_totalbytes(priv->gbuf_filename) == priv->header.filename_length) {
                     memmove(
@@ -285,7 +290,9 @@ int process_data(hgobj gobj, GBUFFER *gbuf)
                         priv->header.filename_length
                     );
 
-                    //trace_msg0("Next state: ST_WAIT_CONTENT");
+                    if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
+                        trace_msg0("Next state: ST_WAIT_CONTENT");
+                    }
                     priv->state = ST_WAIT_CONTENT;
                 }
             }
@@ -300,7 +307,9 @@ int process_data(hgobj gobj, GBUFFER *gbuf)
                 );
                 gbflen -= written;
                 //gbuf += written;
-                //trace_msg0("st %d, consumo %d, quedan %d", priv->state, (int)written, (int)gbflen);
+                if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
+                    trace_msg0("st %d, consumo %d, quedan %d", priv->state, (int) written, (int) gbflen);
+                }
 
                 if(gbuf_totalbytes(priv->gbuf_content) == priv->header.file_length) {
 
@@ -308,16 +317,20 @@ int process_data(hgobj gobj, GBUFFER *gbuf)
 
                     gbuf_setlabel(priv->gbuf_content, priv->filename);
 
-                    json_t *kw_publish = json_pack("{s:I}",
+                    json_t *kw_publish = json_pack("{s:s, s:s, s:I}",
+                        "type", "file",
+                        "filename", priv->filename,
                         "gbuffer", (json_int_t)(size_t)priv->gbuf_content
                     );
-
-                    gobj_publish_event(gobj, "EV_ON_FILE", kw_publish);
+                    priv->gbuf_content = 0;
+                    gobj_publish_event(gobj, "EV_ON_MESSAGE", kw_publish);
 
                     GBUF_DECREF(priv->gbuf_filename)
                     gbuf_clear(priv->gbuf_header);
 
-                    //trace_msg0("Next state: ST_WAIT_HEADER");
+                    if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
+                        trace_msg0("Next state: ST_WAIT_HEADER");
+                    }
                     priv->state = ST_WAIT_HEADER;
                 }
             }
@@ -325,10 +338,14 @@ int process_data(hgobj gobj, GBUFFER *gbuf)
         }
     }
 
-    trace_msg0("SALGO st %d, recibo %d bytes\n", priv->state, (int)gbflen);
+    if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
+        trace_msg0("SALGO st %d, recibo %d bytes\n", priv->state, (int) gbflen);
+    }
 
     return 0;
 }
+
+
 
 
             /***************************
@@ -358,11 +375,16 @@ PRIVATE int ac_connected(hgobj gobj, const char *event, json_t *kw, hgobj src)
 
     priv->gbuf_header = gbuf_create(sizeof(header_t), sizeof(header_t), 0, 0);
     if(!priv->gbuf_header) {
-        trace_msg0("Disconnected !priv->gbuf_header");
-        return -1;
+        log_error(LOG_OPT_TRACE_STACK|LOG_OPT_EXIT_NEGATIVE,
+            "gobj",         "%s", gobj_full_name(gobj),
+            "function",     "%s", __FUNCTION__,
+            "msgset",       "%s", MSGSET_MEMORY_ERROR,
+            "msg",          "%s", "No memory fo gbuf",
+            NULL
+        );
     }
 
-    KW_DECREF(kw);
+    KW_DECREF(kw)
     return 0;
 }
 
@@ -392,7 +414,7 @@ PRIVATE int ac_disconnected(hgobj gobj, const char *event, json_t *kw, hgobj src
         GBUF_DECREF(priv->gbuf_header)
     }
     if(priv->gbuf_content) {
-        //GBUF_DECREF(priv->gbuf_content)
+        GBUF_DECREF(priv->gbuf_content)
     }
     if(priv->gbuf_filename) {
         GBUF_DECREF(priv->gbuf_filename)
@@ -412,7 +434,7 @@ PRIVATE int ac_rx_data(hgobj gobj, const char *event, json_t *kw, hgobj src)
 
     set_timeout(priv->timer, priv->timeout_inactivity);
 
-    if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
+    if(gobj_trace_level(gobj) & TRACE_TRAFFIC) {
         log_debug_gbuf(LOG_DUMP_INPUT, gbuf, "%s", gobj_short_name(gobj));
     }
 

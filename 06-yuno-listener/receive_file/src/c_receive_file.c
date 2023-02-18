@@ -311,7 +311,7 @@ PRIVATE int ac_timeout(hgobj gobj, const char *event, json_t *kw, hgobj src)
  ***************************************************************************/
 PRIVATE const EVENT input_events[] = {
     // top input
-    {"EV_ON_FILE",      0,  0,  ""},
+    {"EV_ON_MESSAGE",   0,  0,  ""},
     // bottom input
     {"EV_ON_OPEN",      0,  0,  ""},
     {"EV_ON_CLOSE",     0,  0,  ""},
@@ -329,7 +329,7 @@ PRIVATE const char *state_names[] = {
 };
 
 PRIVATE EV_ACTION ST_IDLE[] = {
-    {"EV_ON_FILE",              ac_on_file,             0},
+    {"EV_ON_MESSAGE",           ac_on_file,             0},
     {"EV_TIMEOUT",              ac_timeout,             0},
     {"EV_ON_OPEN",              ac_on_open,             0},
     {"EV_ON_CLOSE",             ac_on_close,            0},
