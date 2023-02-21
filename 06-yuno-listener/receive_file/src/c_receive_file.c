@@ -267,10 +267,20 @@ PRIVATE int ac_on_file(hgobj gobj, const char *event, json_t *kw, hgobj src)
     GBUFFER *gbuf = (GBUFFER *)(size_t)kw_get_int(kw, "gbuffer", 0, 0);
     const char *filename = kw_get_str(kw, "filename", 0, 0);
 
-    if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
-        trace_msg0("Recive: %s\n", filename);
+    if(empty_string(filename)) {
+        log_warning(LOG_OPT_TRACE_STACK|LOG_OPT_EXIT_NEGATIVE,
+            "gobj",         "%s", gobj_full_name(gobj),
+            "function",     "%s", __FUNCTION__,
+            "msgset",       "%s", MSGSET_APP_ERROR,
+            "msg",          "%s", "filename is empty",
+            "filename",     "%s", filename?filename:"",
+            NULL
+        );
     }
 
+    if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
+        trace_msg0("Receive: %s\n", filename);
+    }
 
     char pathbf[256];
     if(!subdir_exists(priv->path, 0)){
@@ -278,6 +288,7 @@ PRIVATE int ac_on_file(hgobj gobj, const char *event, json_t *kw, hgobj src)
     };
 
     build_path2(pathbf, sizeof(pathbf), priv->path, filename);
+    GBUF_INCREF(gbuf)
     gbuf2file(gbuf, pathbf, 0777, true);
 
     KW_DECREF(kw)

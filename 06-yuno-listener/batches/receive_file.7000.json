@@ -25,7 +25,7 @@
                                 "__prefix_gobj_name__": "input-",
                                 "__gclass_name__": "Channel",
                                 "__disabled__": false,
-                                "connected": false
+                                "opened": false
                             }
                         }
                     }

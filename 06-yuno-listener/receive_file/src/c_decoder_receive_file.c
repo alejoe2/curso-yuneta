@@ -283,10 +283,8 @@ int process_data(hgobj gobj, GBUFFER *gbuf)
                 }
 
                 if(gbuf_totalbytes(priv->gbuf_filename) == priv->header.filename_length) {
-                    memmove(
-                        priv->filename,
-                        gbuf_get(priv->gbuf_filename, priv->header.filename_length),
-                        priv->header.filename_length
+                    snprintf(priv->filename, sizeof(priv->filename), "nombre: %s",
+                         (char *)gbuf_get(priv->gbuf_filename, priv->header.filename_length)
                     );
 
                     if(gobj_trace_level(gobj) & TRACE_MESSAGES) {
@@ -312,18 +310,15 @@ int process_data(hgobj gobj, GBUFFER *gbuf)
                 }
 
                 if(gbuf_totalbytes(priv->gbuf_content) == priv->header.file_length) {
-
-
                     gbuf_setlabel(priv->gbuf_content, priv->filename);
-                    GBUF_INCREF(priv->gbuf_content);
                     json_t *kw_publish = json_pack("{s:s, s:s, s:I}",
                         "type", "file",
                         "filename", priv->filename,
                         "gbuffer", (json_int_t)(size_t)priv->gbuf_content
                     );
                     gobj_publish_event(gobj, "EV_ON_MESSAGE", kw_publish);
-
                     priv->gbuf_content = 0;
+
                     memset(priv->filename, 0, sizeof(priv->filename));
                     GBUF_DECREF(priv->gbuf_filename)
                     gbuf_clear(priv->gbuf_header);
